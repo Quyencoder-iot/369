@@ -61,14 +61,24 @@ cat VISUAL_GUIDE.md | less
 cat QUICK_REFERENCE.md | less
 ```
 
-### 2. Build Examples
+### 2. Build Examples (Qt5 hoặc Qt6)
 
 ```bash
 cd examples
 mkdir build && cd build
+
+# Auto-detect Qt version
 cmake ..
 cmake --build .
+
+# Hoặc chỉ định Qt path
+cmake .. -DCMAKE_PREFIX_PATH=/path/to/Qt/5.15.2/gcc_64
+cmake --build .
 ```
+
+📖 **Hướng dẫn build chi tiết:** [BUILD_INSTRUCTIONS.md](BUILD_INSTRUCTIONS.md)
+
+> ✅ **Tương thích:** Qt 5.6+ và Qt 6.x
 
 ### 3. Chạy Examples
 

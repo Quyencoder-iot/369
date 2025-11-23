@@ -4,18 +4,39 @@ Các ví dụ thực hành cho Qt Model/View framework.
 
 ## 📦 Yêu Cầu
 
-- Qt 6.x
-- CMake 3.16+
-- C++17 compiler
+- **Qt 5.6+** hoặc **Qt 6.x** (tự động detect)
+- CMake 3.5+
+- C++11 compiler
+
+> ✅ Code hoàn toàn tương thích với cả Qt5 và Qt6!
 
 ## 🔨 Build
 
+### Với Qt5 hoặc Qt6 (Auto-detect):
 ```bash
 mkdir build
 cd build
 cmake ..
 cmake --build .
 ```
+
+### Chỉ định Qt5 path (nếu cần):
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_PREFIX_PATH=/path/to/Qt/5.15.2/gcc_64
+cmake --build .
+```
+
+### Chỉ định Qt6 path (nếu cần):
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_PREFIX_PATH=/path/to/Qt/6.5.0/gcc_64
+cmake --build .
+```
+
+📖 **Chi tiết:** Xem [BUILD_INSTRUCTIONS.md](../BUILD_INSTRUCTIONS.md)
 
 ## 🚀 Chạy Examples
 

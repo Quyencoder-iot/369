@@ -295,7 +295,8 @@ int main(int argc, char *argv[]) {
                     proxyModel, &EmployeeFilterProxy::setDepartmentFilter);
     
     // Salary filter
-    QObject::connect(salarySpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
+    // Qt5 compatible: Use static_cast instead of QOverload
+    QObject::connect(salarySpinBox, static_cast<void(QSpinBox::*)(int)>(&QSpinBox::valueChanged),
                     proxyModel, &EmployeeFilterProxy::setMinSalary);
     
     // Update stats when filter changes
