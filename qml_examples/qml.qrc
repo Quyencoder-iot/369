@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/">
+        <file>qml/TodoListView.qml</file>
+        <file>qml/StudentTableView.qml</file>
+    </qresource>
+</RCC>

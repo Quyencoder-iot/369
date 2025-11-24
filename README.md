@@ -4,9 +4,14 @@ Hướng dẫn toàn diện về Qt Model/View framework và QSql, kèm theo ví
 
 ## 📚 Tài Liệu
 
+### 🎨 NEW: QML Examples (Model C++ + View QML)
+- **[qml_examples/](qml_examples/)** - Examples với QML Views
+- **[QUICK_START.md](qml_examples/QUICK_START.md)** - Bắt đầu nhanh với QML
+- **[QML_VS_WIDGETS_GUIDE.md](qml_examples/QML_VS_WIDGETS_GUIDE.md)** - So sánh QML vs Qt Widgets
+
 ### 📖 Main Guides
 
-1. **[QT_MODELS_GUIDE.md](QT_MODELS_GUIDE.md)** - Hướng dẫn chi tiết từ A-Z
+1. **[QT_MODELS_GUIDE.md](QT_MODELS_GUIDE.md)** - Hướng dẫn chi tiết từ A-Z (Qt Widgets)
    - Tổng quan Model/View Architecture
    - QAbstractListModel, QAbstractTableModel, QAbstractItemModel
    - QSql Models (QSqlQueryModel, QSqlTableModel, QSqlRelationalTableModel)
@@ -32,6 +37,7 @@ Hướng dẫn toàn diện về Qt Model/View framework và QSql, kèm theo ví
 
 ### 💻 Examples
 
+#### Qt Widgets Examples (C++ UI):
 Thư mục `examples/` chứa 6 ví dụ hoàn chỉnh:
 
 ```
@@ -44,6 +50,24 @@ examples/
 ├── 06_complete_example.cpp    - Complete App (SQL + Proxy)
 ├── CMakeLists.txt             - Build configuration
 └── README.md                  - Examples documentation
+```
+
+#### QML Examples (C++ Model + QML View):
+Thư mục `qml_examples/` - Kiến trúc hiện đại:
+
+```
+qml_examples/
+├── models/                    - C++ Models
+│   ├── TodoListModel.h/cpp
+│   └── StudentTableModel.h/cpp
+├── qml/                       - QML Views
+│   ├── TodoListView.qml
+│   └── StudentTableView.qml
+├── main_todo.cpp              - Todo app
+├── main_student.cpp           - Student app
+├── CMakeLists.txt
+├── QUICK_START.md             - Bắt đầu nhanh
+└── QML_VS_WIDGETS_GUIDE.md    - So sánh chi tiết
 ```
 
 ## 🚀 Quick Start
