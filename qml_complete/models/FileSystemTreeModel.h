@@ -99,3 +99,38 @@ private:
 };
 
 #endif // FILESYSTEMTREEMODEL_H
+
+/**
+ * ============================================
+ * 📚 SUMMARY - FileSystemTreeModel Header
+ * ============================================
+ * 
+ * CLASS HIERARCHY:
+ * QObject → QAbstractItemModel → FileSystemTreeModel
+ * 
+ * MODEL TYPE: TREE MODEL (Hierarchical/Recursive)
+ * 
+ * KEY DIFFERENCE từ List/Table:
+ * ✅ ListModel: 1D flat structure
+ * ✅ TableModel: 2D flat structure  
+ * ✅ TreeModel: N-level hierarchical structure (parent-child)
+ * ✅ Cần QModelIndex để reference nodes
+ * ✅ Cần index() để tạo child indices
+ * ✅ Cần parent() để navigate lên parent
+ * 
+ * QMODELINDEX CONCEPT:
+ * - Unique reference to a tree node
+ * - Contains: row, column, internal pointer (TreeNode*)
+ * - Invalid index = root node
+ * - Use index() to create child indices
+ * - Use parent() to get parent index
+ * 
+ * REQUIRED OVERRIDES:
+ * ✅ index(row, col, parent) - Tạo QModelIndex cho child
+ * ✅ parent(child) - Lấy parent của child  
+ * ✅ rowCount(parent) - Số children của parent
+ * ✅ columnCount(parent) - Usually 1
+ * ✅ data(index, role) - Data của node
+ * 
+ * ============================================
+ */

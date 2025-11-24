@@ -215,3 +215,240 @@ int StudentTableModel::roleFromName(const QString &roleName) const
     if (roleName == "phone") return PhoneRole;
     return Qt::DisplayRole;
 }
+
+/**
+ * ============================================
+ * 📚 SUMMARY - StudentTableModel Implementation
+ * ============================================
+ * 
+ * MODEL TYPE: QAbstractTableModel (2D Table)
+ * 
+ * KEY IMPLEMENTATIONS:
+ * 
+ * 1. CONSTRUCTOR:
+ *    - Initialize with sample data (5 students)
+ *    - Set m_nextId for auto-increment ID
+ * 
+ * 2. REQUIRED METHODS:
+ * 
+ *    ✅ rowCount():
+ *       - Return m_students.count()
+ *       - Check parent.isValid() (return 0 if valid)
+ * 
+ *    ✅ columnCount():
+ *       - Return 6 (fixed columns)
+ *       - Check parent.isValid()
+ * 
+ *    ✅ data(index, role):
+ *       - DUAL SYSTEM:
+ *         a) Qt Widget Roles (DisplayRole, EditRole):
+ *            → Use index.column() to determine data
+ *         b) QML Custom Roles (UserRole + N):
+ *            → Use role to determine data
+ *       - Validate index first!
+ * 
+ *    ✅ roleNames():
+ *       - Map Qt roles → QML property names
+ *       - IdRole → "studentId"
+ *       - NameRole → "name"
+ *       - etc.
+ * 
+ * 3. EDITING SUPPORT:
+ * 
+ *    ✅ setData(index, value, role):
+ *       - Update m_students[row] field
+ *       - emit dataChanged(index, index, {role})
+ *       - ID column is NOT editable
+ * 
+ *    ✅ flags(index):
+ *       - Base flags + Qt::ItemIsEditable
+ *       - EXCEPT ID column (read-only)
+ * 
+ *    ✅ headerData(section, orientation, role):
+ *       - Return column names (ID, Tên, Tuổi, etc.)
+ *       - Only for horizontal headers
+ * 
+ * 4. CRUD OPERATIONS:
+ * 
+ *    ✅ addStudent():
+ *       - beginInsertRows(parent, row, row)
+ *       - m_students.append({...})
+ *       - endInsertRows()
+ *       - emit rowCountChanged()
+ * 
+ *    ✅ removeStudent():
+ *       - Validate row
+ *       - beginRemoveRows(parent, row, row)
+ *       - m_students.remove(row)
+ *       - endRemoveRows()
+ *       - emit rowCountChanged()
+ * 
+ * 5. QML HELPER METHODS:
+ * 
+ *    ✅ get(row, roleName):
+ *       - Convert roleName → role (roleFromName)
+ *       - Call data() with that role
+ *       - Return value
+ *       
+ *       QML usage:
+ *       var name = studentModel.get(0, "name")
+ * 
+ *    ✅ set(row, roleName, value):
+ *       - Convert roleName → role
+ *       - Call setData() with that role
+ *       
+ *       QML usage:
+ *       studentModel.set(0, "age", 21)
+ * 
+ * 6. STATISTICS:
+ * 
+ *    ✅ gradeACount():
+ *       - Iterate m_students
+ *       - Count students with grade.startsWith("A")
+ *       
+ *       QML usage:
+ *       Label { text: "Grade A: " + studentModel.gradeACount() }
+ * 
+ *    ✅ averageAge():
+ *       - Sum all ages
+ *       - Divide by count
+ *       
+ *       QML usage:
+ *       Label { text: "Avg: " + studentModel.averageAge().toFixed(1) }
+ * 
+ * 7. SORTING:
+ * 
+ *    ✅ sort(column, order):
+ *       - emit layoutAboutToBeChanged()
+ *       - std::sort with lambda comparator
+ *       - emit layoutChanged()
+ *       - NO dataChanged needed!
+ *       
+ *       QML usage:
+ *       Button { onClicked: studentModel.sort(1, Qt.AscendingOrder) }
+ * 
+ * DATA FLOW EXAMPLES:
+ * 
+ * 1. ADD STUDENT:
+ *    QML: studentModel.addStudent("John", 20, "A", "john@email.com")
+ *      ↓
+ *    C++: beginInsertRows(QModelIndex(), 5, 5)
+ *      ↓
+ *    C++: m_students.append({6, "John", 20, "A", "john@email.com", ""})
+ *      ↓
+ *    C++: endInsertRows()
+ *      ↓
+ *    C++: emit rowCountChanged()
+ *      ↓
+ *    QML: TableView detects new row
+ *      ↓
+ *    QML: Calls data() for each cell of new row
+ *      ↓
+ *    QML: Displays new student
+ * 
+ * 2. EDIT CELL:
+ *    QML: TextField { onEditingFinished: studentModel.set(row, "age", 21) }
+ *      ↓
+ *    C++: set() converts "age" → AgeRole
+ *      ↓
+ *    C++: setData(index, 21, AgeRole)
+ *      ↓
+ *    C++: m_students[row].age = 21
+ *      ↓
+ *    C++: emit dataChanged(index, index, {AgeRole})
+ *      ↓
+ *    QML: Property binding detects change
+ *      ↓
+ *    QML: Updates cell display
+ * 
+ * 3. DISPLAY TABLE:
+ *    QML: TableView { model: studentModel }
+ *      ↓
+ *    QML: Asks rowCount() → 5
+ *      ↓
+ *    QML: Asks columnCount() → 6
+ *      ↓
+ *    QML: Creates 5×6 = 30 delegates
+ *      ↓
+ *    QML: For each delegate (row, column):
+ *      ↓
+ *    QML: Calls data(index(row, column), role)
+ *      ↓
+ *    C++: Returns appropriate data
+ *      ↓
+ *    QML: Delegate displays data
+ * 
+ * DUAL ROLE SYSTEM EXPLAINED:
+ * 
+ * Example: Getting student name
+ * 
+ * Method 1: Qt Widgets (column-based)
+ * data(index(0, 1), Qt::DisplayRole)
+ *   → index.row() = 0, index.column() = 1
+ *   → switch (index.column()) { case NameColumn: return student.name; }
+ * 
+ * Method 2: QML (role-based)
+ * data(index(0, 0), NameRole)
+ *   → index.row() = 0, role = NameRole
+ *   → switch (role) { case NameRole: return student.name; }
+ * 
+ * WHY DUAL SYSTEM?
+ * - Qt Widgets uses column numbers
+ * - QML uses role names (cleaner syntax)
+ * - One model, two ways to access!
+ * 
+ * IMPORTANT CONCEPTS:
+ * 
+ * 1. PARENT INDEX:
+ *    - Table models are FLAT (no hierarchy)
+ *    - Always check parent.isValid() → return 0
+ *    - Only root (invalid parent) has data
+ * 
+ * 2. INDEX VALIDATION:
+ *    if (!index.isValid() || index.row() >= m_students.size())
+ *        return QVariant();
+ *    → Prevent crashes!
+ * 
+ * 3. BEGIN/END METHODS:
+ *    - beginInsertRows() BEFORE modification
+ *    - Modify data
+ *    - endInsertRows() AFTER modification
+ *    - Same for removeRows
+ *    - REQUIRED for view updates!
+ * 
+ * 4. SIGNALS:
+ *    - dataChanged() → Cell value changed
+ *    - layoutChanged() → Row order changed (sort)
+ *    - rowCountChanged() → Row added/removed (custom)
+ * 
+ * 5. SORTING:
+ *    - layoutAboutToBeChanged() before
+ *    - Reorder m_students
+ *    - layoutChanged() after
+ *    - Views automatically update!
+ * 
+ * COMPARISON với ListModel:
+ * 
+ * SIMILARITIES:
+ * ✅ Both use QVector for storage
+ * ✅ Both use roles for QML
+ * ✅ Both use begin/end methods
+ * ✅ Both emit signals
+ * 
+ * DIFFERENCES:
+ * ✅ TableModel has columnCount()
+ * ✅ TableModel has headerData()
+ * ✅ TableModel handles 2D indices
+ * ✅ TableModel has editable cells (optional)
+ * 
+ * BEST PRACTICES:
+ * ✅ Always validate indices
+ * ✅ Always use begin/end methods
+ * ✅ Always emit appropriate signals
+ * ✅ Make ID column read-only
+ * ✅ Provide get/set helpers for QML
+ * ✅ Provide statistics methods
+ * ✅ Handle both role systems (Widgets + QML)
+ * 
+ * ============================================
+ */
