@@ -60,3 +60,75 @@ private:
 };
 
 #endif // TODOLISTMODEL_H
+
+/**
+ * ============================================
+ * 📚 SUMMARY - TodoListModel Header
+ * ============================================
+ * 
+ * CLASS HIERARCHY:
+ * QObject → QAbstractItemModel → QAbstractListModel → TodoListModel
+ * 
+ * INHERITANCE:
+ * - QAbstractListModel: Base class for 1D list models
+ * - Provides: data(), rowCount(), etc.
+ * 
+ * Q_OBJECT MACRO:
+ * - Enables Qt meta-object system
+ * - Required for: signals, slots, properties, Q_INVOKABLE
+ * - Processed by moc (Meta-Object Compiler)
+ * 
+ * Q_PROPERTY SYNTAX:
+ * Q_PROPERTY(type name READ getter NOTIFY signal)
+ * 
+ * Example:
+ * Q_PROPERTY(int count READ count NOTIFY countChanged)
+ *   - type: int
+ *   - name: count (accessible as todoModel.count in QML)
+ *   - READ: count() getter function
+ *   - NOTIFY: countChanged() signal (auto-updates QML)
+ * 
+ * Q_INVOKABLE:
+ * - Makes C++ method callable from QML
+ * - Alternative: use "public slots:"
+ * - Example: todoModel.addTodo("text", 1) in QML
+ * 
+ * CUSTOM ROLES:
+ * enum Roles {
+ *     TextRole = Qt::UserRole + 1,  // 256
+ *     CompletedRole,                 // 257
+ *     PriorityRole,                  // 258
+ *     CreatedDateRole                // 259
+ * };
+ * 
+ * WHY Qt::UserRole + N?
+ * - Qt reserves 0-255 for built-in roles
+ * - Qt::UserRole = 256
+ * - Custom roles start at 256+
+ * 
+ * DATA STRUCTURE:
+ * struct Todo {
+ *     QString text;
+ *     bool completed;
+ *     int priority;
+ *     QString createdDate;
+ * };
+ * QList<Todo> m_todos;  // Storage
+ * 
+ * SIGNAL-SLOT CONNECTION:
+ * C++:
+ *   emit countChanged();
+ *     ↓
+ * QML:
+ *   Label { text: todoModel.count }  // Auto-updates!
+ * 
+ * KEY POINTS:
+ * ✅ Always use Q_OBJECT macro
+ * ✅ Declare roles as enum
+ * ✅ Override roleNames()
+ * ✅ Use Q_PROPERTY for QML properties
+ * ✅ Use Q_INVOKABLE for QML methods
+ * ✅ Emit signals when data changes
+ * 
+ * ============================================
+ */

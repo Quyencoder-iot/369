@@ -1,387 +1,409 @@
-# 🎨 Qt Models Complete - QML + C++
+# 🎓 Qt Models with QML - Complete Examples
 
-## 🎯 Tổng Quan
+## 📋 Tổng quan
 
-Project này chứa **ĐẦY ĐỦ** tất cả loại Qt Models với QML Views:
+Bộ ví dụ **HOÀN CHỈNH** về Qt Model/View với QML, bao gồm **TẤT CẢ** các loại model:
 
-1. ✅ **ListModel** - QAbstractListModel
-2. ✅ **TableModel** - QAbstractTableModel  
-3. ✅ **TreeModel** - QAbstractItemModel
-4. ✅ **QSqlModel** - QSqlRelationalTableModel
-5. ✅ **ProxyModel** - QSortFilterProxyModel
+1. ✅ **List Model** - Todo List
+2. ✅ **Table Model** - Student Table
+3. ✅ **Tree Model** - File System
+4. ✅ **SQL Model** - Employee Database
+5. ✅ **Proxy Model** - Product Filter
 
-**Tất cả Models: C++, Tất cả Views: QML!**
-
----
-
-## 📁 Cấu Trúc
+## 🏗️ Cấu trúc dự án
 
 ```
 qml_complete/
-├── models/                          # ← C++ MODELS
-│   ├── TodoListModel.h/cpp         # Example 1: List Model
-│   ├── StudentTableModel.h/cpp     # Example 2: Table Model
-│   ├── FileSystemTreeModel.h/cpp   # Example 3: Tree Model
-│   ├── EmployeeSqlModel.h/cpp      # Example 4: SQL Model
-│   └── ProductFilterProxyModel.h/cpp # Example 5: Proxy Model
+├── README.md                          (Bạn đang đọc đây!)
+├── CMakeLists.txt                     (Build configuration)
+├── qml.qrc                            (QML resources)
 │
-├── qml/                             # ← QML VIEWS
-│   ├── TodoListView.qml            # List View
-│   ├── StudentTableView.qml        # Table View
-│   ├── FileTreeView.qml            # Tree View
-│   ├── EmployeeSqlView.qml         # SQL View
-│   └── ProductFilterView.qml       # Proxy View
+├── main_01_todo.cpp                   (Todo List app entry)
+├── main_02_student.cpp                (Student Table app entry)
+├── main_03_tree.cpp                   (File System app entry)
+├── main_04_sql.cpp                    (Employee SQL app entry)
+├── main_05_proxy.cpp                  (Product Filter app entry)
 │
-├── main_01_list.cpp                 # Entry point Example 1
-├── main_02_table.cpp                # Entry point Example 2
-├── main_03_tree.cpp                 # Entry point Example 3
-├── main_04_sql.cpp                  # Entry point Example 4
-├── main_05_proxy.cpp                # Entry point Example 5
-├── qml.qrc                          # Resource file
-└── CMakeLists.txt                   # Build config
+├── models/                            (C++ Models)
+│   ├── TodoListModel.h/cpp           (QAbstractListModel)
+│   ├── StudentTableModel.h/cpp       (QAbstractTableModel)
+│   ├── FileSystemTreeModel.h/cpp     (QAbstractItemModel)
+│   ├── EmployeeSqlModel.h/cpp        (QSqlRelationalTableModel wrapper)
+│   └── ProductFilterProxyModel.h/cpp (QSortFilterProxyModel)
+│
+└── qml/                               (QML Views)
+    ├── TodoListView.qml              (Todo List UI)
+    ├── StudentTableView.qml          (Student Table UI)
+    ├── FileSystemTreeView.qml        (File System Tree UI)
+    ├── EmployeeSqlView.qml           (Employee Database UI)
+    └── ProductFilterProxyView.qml    (Product Filter UI)
 ```
-
----
 
 ## 🚀 Build & Run
 
-### Build All:
+### Prerequisites
+
+- Qt5 (5.12+) hoặc Qt6 (6.0+)
+- CMake 3.5+
+- C++11 compiler
+
+### Build Instructions
+
 ```bash
-cd /workspace/qml_complete
+cd qml_complete
 mkdir build && cd build
 cmake ..
-make -j$(nproc)
+make
 ```
 
-### Run Examples:
+### Run Examples
+
 ```bash
-# Example 1: List Model - Todo List
-./qml_01_list
+# Example 1: Todo List
+./example_01_todo
 
-# Example 2: Table Model - Student Table
-./qml_02_table
+# Example 2: Student Table
+./example_02_student
 
-# Example 3: Tree Model - File System Tree
-./qml_03_tree
+# Example 3: File System Tree
+./example_03_tree
 
-# Example 4: SQL Model - Employee Database
-./qml_04_sql
+# Example 4: Employee SQL
+./example_04_sql
 
-# Example 5: Proxy Model - Product Filter
-./qml_05_proxy
+# Example 5: Product Filter Proxy
+./example_05_proxy
 ```
 
----
+## 📚 Chi tiết từng Example
 
-## 📖 Chi Tiết Từng Example
+### 1️⃣ Example 1: Todo List (QAbstractListModel)
 
-### Example 1: List Model (TodoListModel)
+**Model:** `TodoListModel`
+**View:** `TodoListView.qml`
 
-**C++ Model:**
-- `QAbstractListModel`
-- Roles: text, completed, priority, createdDate
-- Methods: addTodo(), removeTodo(), toggleCompleted()
+**Học được gì:**
+- ✅ QAbstractListModel cơ bản
+- ✅ Custom roles (text, completed, priority)
+- ✅ CRUD operations (add, remove, update)
+- ✅ Q_PROPERTY cho property binding
+- ✅ Q_INVOKABLE methods
+- ✅ ListView trong QML
 
-**QML View:**
-- ListView với delegates
-- Add/Edit/Delete operations
-- Filter by completed status
-- Statistics display
+**Key Features:**
+- Add/Remove todos
+- Toggle completed status
+- Priority levels (High/Medium/Low)
+- Statistics (total, completed, incomplete)
+- Filter by status
 
-**Key Concepts:**
-- `roleNames()` - Expose roles sang QML
-- `Q_INVOKABLE` - Call C++ methods từ QML
-- `emit dataChanged()` - Update UI
+### 2️⃣ Example 2: Student Table (QAbstractTableModel)
 
----
+**Model:** `StudentTableModel`
+**View:** `StudentTableView.qml`
 
-### Example 2: Table Model (StudentTableModel)
+**Học được gì:**
+- ✅ QAbstractTableModel (2D data)
+- ✅ rowCount() AND columnCount()
+- ✅ Multiple columns (6 columns)
+- ✅ Editable cells
+- ✅ TableView trong QML
+- ✅ HorizontalHeaderView
 
-**C++ Model:**
-- `QAbstractTableModel`
-- Columns: ID, Name, Age, Grade, Email, Phone
-- Methods: addStudent(), removeStudent(), sort()
+**Key Features:**
+- Add/Edit/Delete students
+- 6 columns: ID, Name, Age, Grade, Email, Phone
+- Search functionality
+- Statistics (Grade A count, Average Age)
+- Column headers
 
-**QML View:**
-- TableView với columns
-- Search/Filter
-- Inline editing
-- Statistics (Grade A count, Average age)
+### 3️⃣ Example 3: File System Tree (QAbstractItemModel)
 
-**Key Concepts:**
-- `rowCount()` và `columnCount()`
-- `headerData()` - Column headers
-- Custom delegates for editing
+**Model:** `FileSystemTreeModel`
+**View:** `FileSystemTreeView.qml`
 
----
+**Học được gì:**
+- ✅ QAbstractItemModel (hierarchical data)
+- ✅ QModelIndex concept
+- ✅ parent() và index() methods
+- ✅ Recursive structure
+- ✅ Expand/Collapse state
+- ✅ Tree navigation
 
-### Example 3: Tree Model (FileSystemTreeModel)
+**Key Features:**
+- Hierarchical file/folder structure
+- Expand/Collapse folders
+- Add/Remove files and folders
+- Show file size and modified date
+- Depth-based indentation
+- Statistics (total, folders, files)
 
-**C++ Model:**
-- `QAbstractItemModel`
-- Hierarchical structure (folders/files)
-- Methods: index(), parent(), addFolder(), addFile()
+### 4️⃣ Example 4: Employee SQL (QSqlRelationalTableModel)
 
-**QML View:**
-- TreeView với expand/collapse
-- Folder/File icons
-- Size display
-- Add/Remove nodes
+**Model:** `EmployeeSqlModel`
+**View:** `EmployeeSqlView.qml`
 
-**Key Concepts:**
-- `index()` - Create index với internalPointer
-- `parent()` - Find parent index
-- TreeNode structure
+**Học được gì:**
+- ✅ QSqlTableModel (database mapping)
+- ✅ QSqlRelationalTableModel (foreign keys)
+- ✅ Direct table editing
+- ✅ Transaction support (submit/revert)
+- ✅ Foreign key relationships
+- ✅ In-memory SQLite database
 
----
-
-### Example 4: SQL Model (EmployeeSqlModel)
-
-**C++ Model:**
-- `QSqlRelationalTableModel`
-- Foreign key: employees.department_id → departments.name
-- Methods: addEmployee(), submitChanges(), filterByDepartment()
-
-**QML View:**
-- TableView từ database
-- CRUD operations
+**Key Features:**
+- Direct database CRUD
+- Foreign key to departments table
+- Editable cells with auto-save
+- Submit/Revert changes
+- Statistics (average salary, count)
 - Department filter
-- Statistics (Average salary)
 
-**Key Concepts:**
-- `QSqlRelation()` - Foreign keys
-- `submitAll()` / `revertAll()`
-- Database connection
+### 5️⃣ Example 5: Product Filter Proxy (QSortFilterProxyModel)
 
----
+**Model:** `ProductFilterProxyModel` (wraps `ProductModel`)
+**View:** `ProductFilterProxyView.qml`
 
-### Example 5: Proxy Model (ProductFilterProxyModel)
+**Học được gì:**
+- ✅ QSortFilterProxyModel concept
+- ✅ Source model vs Proxy model
+- ✅ filterAcceptsRow() override
+- ✅ lessThan() for sorting
+- ✅ Multiple filter criteria
+- ✅ Dynamic filtering
 
-**C++ Model:**
-- `QSortFilterProxyModel`
-- Source: ProductModel
-- Filters: search, category, price, rating, stock
+**Key Features:**
+- Filter by category, price range, stock
+- Search by product name
+- Sort by name, price, stock
+- Statistics (source vs filtered)
+- Real-time filter updates
+- Source model unchanged
 
-**QML View:**
-- ListView with filtering
-- Multiple filter controls
-- Sort by price
-- Statistics (Average price, In stock count)
+## 🎯 Concepts Covered
 
-**Key Concepts:**
-- `filterAcceptsRow()` - Filter logic
-- `lessThan()` - Sort logic
-- `setSourceModel()` - Connect to source
+### C++ Model Concepts
 
----
+1. **QAbstractListModel** (1D list)
+   - rowCount()
+   - data(index, role)
+   - roleNames()
 
-## 🔑 Key Techniques
+2. **QAbstractTableModel** (2D table)
+   - rowCount() + columnCount()
+   - data(index, role) with column logic
 
-### 1. Expose Model sang QML
+3. **QAbstractItemModel** (Tree/Hierarchical)
+   - parent(child)
+   - index(row, col, parent)
+   - QModelIndex for navigation
 
-```cpp
-// main.cpp
-QQmlApplicationEngine engine;
-TodoListModel todoModel;
-engine.rootContext()->setContextProperty("todoModel", &todoModel);
-engine.load(QUrl("qrc:/qml/TodoListView.qml"));
-```
+4. **QSqlTableModel** (Database)
+   - Direct table mapping
+   - setData() for editing
+   - submit()/revert() for transactions
 
-```qml
-// TodoListView.qml
-ListView {
-    model: todoModel  // Access C++ model
-}
-```
+5. **QSortFilterProxyModel** (Filter/Sort)
+   - setSourceModel()
+   - filterAcceptsRow()
+   - lessThan()
 
-### 2. Custom Roles
+### QML Integration
 
-```cpp
-QHash<int, QByteArray> roleNames() const override {
-    return {
-        {TextRole, "text"},
-        {CompletedRole, "completed"}
-    };
-}
-```
+1. **setContextProperty**
+   ```cpp
+   engine.rootContext()->setContextProperty("modelName", &modelObject);
+   ```
 
-```qml
-delegate: Text {
-    text: model.text         // Access TextRole
-    opacity: model.completed ? 0.5 : 1.0
-}
-```
+2. **Access from QML**
+   ```qml
+   ListView {
+       model: modelName
+       delegate: Text { text: model.roleName }
+   }
+   ```
 
-### 3. Call C++ Methods
+3. **Call C++ methods**
+   ```qml
+   Button {
+       onClicked: modelName.methodName(params)
+   }
+   ```
 
-```cpp
-Q_INVOKABLE void addTodo(const QString &text, int priority);
-```
+4. **Property binding**
+   ```qml
+   Label {
+       text: "Count: " + modelName.propertyName
+   }
+   ```
 
-```qml
-Button {
-    onClicked: todoModel.addTodo("New task", 1)
-}
-```
+### Qt Meta-Object System
 
-### 4. Properties & Signals
+- **Q_OBJECT** - Enable meta-object features
+- **Q_PROPERTY** - Expose properties to QML
+- **Q_INVOKABLE** - Make methods callable from QML
+- **signals** - Emit notifications
+- **slots** - Receive notifications
 
-```cpp
-Q_PROPERTY(int count READ rowCount NOTIFY countChanged)
-```
+## 📖 Code Comments
 
-```qml
-Label {
-    text: "Total: " + todoModel.count
-    // Auto-updates when countChanged emitted
-}
-```
-
----
-
-## 📊 Comparison Table
-
-| Model Type | When to Use | Complexity | Example |
-|------------|-------------|------------|---------|
-| **ListModel** | 1D data | ⭐ Easy | Todo list, Music playlist |
-| **TableModel** | 2D data | ⭐⭐ Medium | Spreadsheet, Student grades |
-| **TreeModel** | Hierarchical | ⭐⭐⭐ Hard | File system, Org chart |
-| **SqlModel** | Database | ⭐⭐ Medium | Employee DB, Inventory |
-| **ProxyModel** | Filter/Sort | ⭐⭐ Medium | Search results, Filtered list |
-
----
-
-## 🛠️ Development Workflow
-
-### 1. Create C++ Model:
-```cpp
-class MyModel : public QAbstractListModel {
-    Q_OBJECT
-    Q_PROPERTY(int count READ rowCount NOTIFY countChanged)
-    
-public:
-    QHash<int, QByteArray> roleNames() const override;
-    Q_INVOKABLE void addItem(const QString &text);
-};
-```
-
-### 2. Expose to QML:
-```cpp
-MyModel myModel;
-engine.rootContext()->setContextProperty("myModel", &myModel);
-```
-
-### 3. Create QML View:
-```qml
-ListView {
-    model: myModel
-    delegate: Text { text: model.text }
-}
-Button {
-    onClicked: myModel.addItem("New")
-}
-```
-
----
+Mỗi file đều có:
+- ✅ **Header comments** - Giải thích mục đích
+- ✅ **Inline comments** - Giải thích từng đoạn code
+- ✅ **Summary section** - Tổng kết ở cuối file
+- ✅ **Key concepts** - Những điểm quan trọng
+- ✅ **Data flow diagrams** - Sơ đồ luồng dữ liệu
 
 ## 🎓 Learning Path
 
+### Beginner (Tuần 1-2)
+
+1. Start with **Example 1 (Todo List)**
+   - Hiểu QAbstractListModel
+   - Hiểu roleNames()
+   - Hiểu ListView trong QML
+
+2. Move to **Example 2 (Student Table)**
+   - Hiểu QAbstractTableModel
+   - Hiểu columnCount()
+   - Hiểu TableView trong QML
+
+### Intermediate (Tuần 3)
+
+3. Study **Example 3 (File System Tree)**
+   - Hiểu QAbstractItemModel
+   - Hiểu QModelIndex
+   - Hiểu recursive structures
+
+4. Learn **Example 4 (Employee SQL)**
+   - Hiểu QSqlTableModel
+   - Hiểu foreign keys
+   - Hiểu transactions
+
+### Advanced (Tuần 4)
+
+5. Master **Example 5 (Product Filter Proxy)**
+   - Hiểu proxy pattern
+   - Hiểu filtering logic
+   - Hiểu source vs proxy
+
+## 🔧 Customization
+
+### Thêm roles mới
+
+```cpp
+// In model header
+enum Roles {
+    ExistingRole = Qt::UserRole + 1,
+    NewRole = Qt::UserRole + 2  // Add here
+};
+
+// In roleNames()
+QHash<int, QByteArray> roleNames() const override {
+    return {
+        {ExistingRole, "existing"},
+        {NewRole, "newRole"}  // Add here
+    };
+}
+
+// In data()
+case NewRole:
+    return m_data.at(index.row()).newField;
 ```
-1. Start: ListModel (Easiest)
-   └─ Understand: roleNames(), Q_INVOKABLE
-   
-2. Next: TableModel
-   └─ Learn: rowCount(), columnCount()
-   
-3. Then: ProxyModel
-   └─ Master: filterAcceptsRow()
-   
-4. After: SqlModel
-   └─ Understand: Database integration
-   
-5. Final: TreeModel (Most Complex)
-   └─ Master: index(), parent(), hierarchies
+
+### Thêm methods mới
+
+```cpp
+// In model header
+Q_INVOKABLE void newMethod(int param);
+
+// In model implementation
+void Model::newMethod(int param) {
+    // Implementation
+    emit someSignal();  // Notify QML
+}
+
+// In QML
+Button {
+    onClicked: modelName.newMethod(value)
+}
 ```
-
----
-
-## 💡 Tips & Tricks
-
-### Hot Reload QML:
-```bash
-# Edit QML files without rebuilding C++
-qmlscene qml/TodoListView.qml
-```
-
-### Debug:
-```qml
-console.log("Value:", model.text)
-```
-
-### Performance:
-- Use `QAbstractListModel` for lists (faster than TableModel)
-- Implement `canFetchMore()` for lazy loading
-- Use Proxy for filtering (don't modify source)
-
----
 
 ## 🐛 Common Issues
 
-### Issue 1: "model.xxx is undefined"
+### 1. QML không thấy C++ model
 
-**Cause:** Role name not in `roleNames()`
+**Fix:** Check setContextProperty:
+```cpp
+engine.rootContext()->setContextProperty("modelName", &modelObject);
+```
 
-**Fix:**
+### 2. QML property không update
+
+**Fix:** Check Q_PROPERTY NOTIFY:
+```cpp
+Q_PROPERTY(int count READ count NOTIFY countChanged)
+signals:
+    void countChanged();
+```
+
+### 3. Roles không work trong QML
+
+**Fix:** Check roleNames() override:
 ```cpp
 QHash<int, QByteArray> roleNames() const override {
-    return {{TextRole, "text"}};  // Add "text" role
+    return {{TextRole, "text"}};
 }
 ```
 
-### Issue 2: Model không update
+### 4. beginInsertRows crash
 
-**Cause:** Forgot emit signals
-
-**Fix:**
+**Fix:** Check parent QModelIndex:
 ```cpp
-void addItem() {
-    beginInsertRows(...);
-    m_items.append(...);
-    endInsertRows();  // This emits signals!
-}
+beginInsertRows(QModelIndex(), row, row);  // For list/table
+// NOT beginInsertRows(invalidIndex, ...)
 ```
 
-### Issue 3: Tree model không expand
+## 📝 Best Practices
 
-**Cause:** Wrong `parent()` implementation
+1. ✅ **Always emit signals** when data changes
+2. ✅ **Always call begin/end methods** for insert/remove
+3. ✅ **Use Q_PROPERTY** for QML-accessible properties
+4. ✅ **Use Q_INVOKABLE** for QML-callable methods
+5. ✅ **Override roleNames()** for QML role access
+6. ✅ **Use const references** for parameters
+7. ✅ **Check indices** before accessing data
+8. ✅ **Document your code** with comments
 
-**Fix:** Check `parent()` returns correct QModelIndex
+## 🚀 Next Steps
+
+Sau khi học xong 5 examples này, bạn có thể:
+
+1. ✅ Tạo custom models cho app của bạn
+2. ✅ Integrate với databases (SQLite, PostgreSQL, etc.)
+3. ✅ Tạo complex filters với proxy models
+4. ✅ Build production-ready QML apps
+5. ✅ Understand Qt Model/View architecture deeply
+
+## 📚 Additional Resources
+
+- [Qt Model/View Documentation](https://doc.qt.io/qt-6/model-view-programming.html)
+- [QML Documentation](https://doc.qt.io/qt-6/qmlapplications.html)
+- [Qt Examples](https://doc.qt.io/qt-6/qtexamples.html)
+
+## 📧 Contact & Feedback
+
+Nếu có câu hỏi hoặc feedback, vui lòng:
+- Đọc lại comments trong code
+- Check summary sections ở cuối mỗi file
+- Review data flow diagrams
+
+## ⚖️ License
+
+This project is for educational purposes.
 
 ---
 
-## 📚 Resources
+**🎉 Chúc bạn học tốt Qt Models & QML!**
 
-- [Qt QML](https://doc.qt.io/qt-5/qtqml-index.html)
-- [Models for QML](https://doc.qt.io/qt-5/qtquick-modelviewsdata-cppmodels.html)
-- [QAbstractItemModel](https://doc.qt.io/qt-5/qabstractitemmodel.html)
-
----
-
-## ✅ Checklist
-
-- [x] 5 C++ Models implemented
-- [x] 5 QML Views created
-- [x] Q_PROPERTY for all models
-- [x] Q_INVOKABLE methods
-- [x] roleNames() override
-- [x] Signals for updates
-- [x] CMakeLists.txt
-- [x] Documentation
-
----
-
-**Start learning with Example 1 (List Model) - Easiest!** 📝
-
-**Then progress through examples 2-5.** 🚀
-
-**Master all Qt Model types!** 🎓
+Made with ❤️ for Qt learners

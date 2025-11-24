@@ -148,3 +148,80 @@ int TodoListModel::incompleteCount() const
 {
     return m_todos.count() - completedCount();
 }
+
+/**
+ * ============================================
+ * 📚 SUMMARY - TodoListModel Implementation
+ * ============================================
+ * 
+ * MODEL TYPE: QAbstractListModel (1D list)
+ * 
+ * KEY METHODS IMPLEMENTED:
+ * ✅ rowCount() - Số lượng items
+ * ✅ data() - Lấy data theo role
+ * ✅ setData() - Sửa data (optional, for editing)
+ * ✅ roleNames() - Map roles → QML property names
+ * ✅ flags() - Item flags (editable, selectable, etc.)
+ * 
+ * CRUD OPERATIONS (Q_INVOKABLE):
+ * ✅ addTodo() - Thêm item
+ * ✅ removeTodo() - Xóa item
+ * ✅ toggleCompleted() - Update item
+ * ✅ clear() - Xóa tất cả
+ * 
+ * Q_PROPERTY (for QML binding):
+ * ✅ count - Total todos
+ * ✅ completedCount - Completed todos
+ * ✅ incompleteCount - Incomplete todos
+ * 
+ * SIGNALS (auto-update QML):
+ * ✅ countChanged()
+ * ✅ completedCountChanged()
+ * ✅ incompleteCountChanged()
+ * ✅ dataChanged() - From QAbstractListModel
+ * 
+ * DATA FLOW:
+ * 1. User action in QML (e.g., button click)
+ *    ↓
+ * 2. Call Q_INVOKABLE method (e.g., addTodo)
+ *    ↓
+ * 3. beginInsertRows() - Notify view
+ *    ↓
+ * 4. Modify m_todos (QList<Todo>)
+ *    ↓
+ * 5. endInsertRows() - Finalize notification
+ *    ↓
+ * 6. emit signals (countChanged, etc.)
+ *    ↓
+ * 7. QML property bindings auto-update
+ *    ↓
+ * 8. QML ListView calls data() for new item
+ *    ↓
+ * 9. UI displays updated data
+ * 
+ * ROLES EXPLAINED:
+ * - TextRole (Qt::UserRole + 1) → "text" in QML
+ * - CompletedRole (Qt::UserRole + 2) → "completed" in QML
+ * - PriorityRole (Qt::UserRole + 3) → "priority" in QML
+ * - CreatedDateRole (Qt::UserRole + 4) → "createdDate" in QML
+ * 
+ * QML ACCESS:
+ * ListView {
+ *     model: todoModel
+ *     delegate: Rectangle {
+ *         Text { text: model.text }  ← TextRole
+ *         CheckBox { checked: model.completed }  ← CompletedRole
+ *     }
+ * }
+ * 
+ * IMPORTANT CONCEPTS:
+ * 1. beginInsertRows/endInsertRows - MUST be called
+ * 2. beginRemoveRows/endRemoveRows - MUST be called
+ * 3. emit dataChanged() - For in-place edits
+ * 4. roleNames() - Qt::UserRole + N → string names
+ * 5. Q_INVOKABLE - Makes C++ methods callable from QML
+ * 6. Q_PROPERTY - Makes C++ properties accessible in QML
+ * 7. NOTIFY signal - Auto-updates QML when property changes
+ * 
+ * ============================================
+ */

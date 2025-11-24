@@ -1,0 +1,83 @@
+<!--
+============================================
+QML RESOURCE FILE
+============================================
+
+PURPOSE:
+Embed QML files into the executable binary
+
+ADVANTAGES:
+✅ Single executable (no external QML files)
+✅ Faster loading (no file I/O)
+✅ Protection (QML code compiled into binary)
+✅ Deployment (no missing file errors)
+
+USAGE:
+In C++: QUrl url("qrc:/qml/filename.qml");
+In QML: import "qrc:/qml/"
+
+PREFIX:
+"/" → Root of resource system
+Access via: qrc:/qml/...
+-->
+
+<RCC>
+    <qresource prefix="/">
+        <!-- ======================== -->
+        <!-- QML VIEW FILES           -->
+        <!-- ======================== -->
+        <file>qml/TodoListView.qml</file>
+        <file>qml/StudentTableView.qml</file>
+        <file>qml/FileSystemTreeView.qml</file>
+        <file>qml/EmployeeSqlView.qml</file>
+        <file>qml/ProductFilterProxyView.qml</file>
+    </qresource>
+</RCC>
+
+<!--
+============================================
+📚 RESOURCE SYSTEM SUMMARY
+============================================
+
+1. WHAT IS .qrc?
+   - XML file listing resources to embed
+   - Processed by Qt's rcc (Resource Compiler)
+   - Generates C++ code with embedded data
+   - Linked into executable
+
+2. PREFIX:
+   <qresource prefix="/foo">
+     <file>bar.qml</file>
+   </qresource>
+   
+   Access: qrc:/foo/bar.qml
+
+3. ALIASES (optional):
+   <file alias="myfile.qml">actual/path/file.qml</file>
+   Access: qrc:/myfile.qml
+
+4. CMake INTEGRATION:
+   Qt5: qt5_add_resources(RESOURCES qml.qrc)
+   Qt6: qt_add_resources(executable qml.qrc)
+
+5. ADVANTAGES:
+   ✅ Portable - No external file dependencies
+   ✅ Fast - No disk I/O at runtime
+   ✅ Secure - Files embedded in binary
+   ✅ Cross-platform - Works everywhere
+
+6. WHEN TO USE:
+   ✅ Production builds
+   ✅ QML files
+   ✅ Images, icons
+   ✅ Configuration files
+   ✅ Translations (.qm files)
+
+7. WHEN NOT TO USE:
+   ❌ Large media files (videos)
+   ❌ User-editable content
+   ❌ Frequently changing files
+   ❌ Development (slower build times)
+
+============================================
+-->
