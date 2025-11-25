@@ -99,7 +99,41 @@
 
 ---
 
-### 5️⃣ [Qt_SQL_Architecture_Diagrams.md](Qt_SQL_Architecture_Diagrams.md) (40KB)
+### 5️⃣ [Qt_SQL_QML_Examples.md](Qt_SQL_QML_Examples.md) (85KB) ⭐ NEW!
+**📱 C++ Model + QML View Examples**
+
+**Đọc khi:**
+- Bạn muốn build modern Qt apps với QML
+- Bạn cần tách biệt Model (C++) và View (QML)
+- Bạn muốn UI đẹp và responsive
+
+**Nội dung chính:**
+- ✅ 8 complete examples (C++ backend + QML frontend)
+  1. Basic Setup - Expose QSqlTableModel to QML
+  2. QSqlTableModel + QML ListView (Advanced UI)
+  3. Custom C++ Model (QAbstractListModel) for QML
+  4. Complete CRUD App - Production Quality
+  5. Real-time Updates với Signals/Slots
+  6. Advanced Filtering and Sorting
+  7. Multi-page Navigation App
+  8. Production Architecture (DI, Repository, ViewModel)
+- ✅ Modern architecture patterns
+- ✅ Material Design với QML
+- ✅ Best practices cho C++/QML integration
+
+**Thời gian đọc:** ~2-3 giờ
+
+**Tại sao nên dùng QML:**
+- ✅ Tách biệt rõ ràng Business Logic (C++) và UI (QML)
+- ✅ Hot reload trong development
+- ✅ Cross-platform: Desktop, Mobile, Embedded
+- ✅ Declarative UI - dễ maintain
+- ✅ Hardware acceleration
+- ✅ Rich animations & transitions
+
+---
+
+### 6️⃣ [Qt_SQL_Architecture_Diagrams.md](Qt_SQL_Architecture_Diagrams.md) (40KB)
 **📊 Visual Diagrams & Flow Charts**
 
 **Đọc khi:**

@@ -44,18 +44,31 @@ Phương pháp đọc và phân tích Qt source code
 - Code reading checklist
 - Debugging techniques
 
-### 💻 [4. Practical Examples](Qt_SQL_Practical_Examples.md)
-8 ví dụ hoàn chỉnh có thể compile và chạy
+### 💻 [4. Practical Examples - C++ Only](Qt_SQL_Practical_Examples.md)
+8 ví dụ hoàn chỉnh bằng C++ thuần
 
 **Bao gồm:**
 1. Basic CRUD Application
 2. Transaction Management
 3. Batch Operations
-4. QSqlTableModel + QTableView (GUI)
+4. QSqlTableModel + QTableView (C++ GUI)
 5. Multi-threading
 6. Custom Models
 7. Connection Pooling
 8. JSON Export/Import
+
+### 📱 [5. QML Examples - C++ Model + QML View](Qt_SQL_QML_Examples.md) ⭐ MỚI!
+8 ví dụ với architecture hiện đại: **C++ Backend + QML Frontend**
+
+**Bao gồm:**
+1. Basic Setup - Expose Model to QML
+2. QSqlTableModel + QML ListView
+3. Custom C++ Model for QML
+4. Complete CRUD App (Production Quality)
+5. Real-time Updates with Signals
+6. Advanced Filtering and Sorting
+7. Multi-page Navigation App
+8. Production Architecture with DI
 
 ## 🚀 Quick Start
 
