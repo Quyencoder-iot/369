@@ -1,1086 +1,1549 @@
-# Qt SQL - Ví Dụ Thực Tế (Practical Examples)
+# Qt SQL - Ví Dụ Thực Tế (C++ Model + QML View)
 
-## 📁 Complete Working Examples
+> **Architecture:** Mỗi example gồm 3 files chính: Model (C++), View (QML), main.cpp
+
+## 📋 Table of Contents
+
+1. [Example 1: Basic CRUD - Simple Todo App](#example-1-basic-crud---simple-todo-app)
+2. [Example 2: User Management with Material Design](#example-2-user-management-with-material-design)
+3. [Example 3: Real-time Dashboard](#example-3-real-time-dashboard)
+4. [Example 4: Multi-page App with Navigation](#example-4-multi-page-app-with-navigation)
+5. [Example 5: Advanced Filtering & Search](#example-5-advanced-filtering--search)
+6. [Example 6: Transaction Management](#example-6-transaction-management)
+7. [Example 7: Master-Detail View](#example-7-master-detail-view)
+8. [Example 8: Production App with Clean Architecture](#example-8-production-app-with-clean-architecture)
 
 ---
 
-## Example 1: Basic SQLite CRUD Application
+## Example 1: Basic CRUD - Simple Todo App
+
+### 📁 Project Structure
+```
+todo-app/
+├── todomodel.h          # Model header
+├── todomodel.cpp        # Model implementation
+├── main.qml             # QML view
+├── main.cpp             # Application entry
+├── todo.pro             # qmake project file
+├── CMakeLists.txt       # CMake project file
+└── qml.qrc              # Resource file
+```
+
+### 📄 todomodel.h
 
 ```cpp
-#include <QCoreApplication>
+#ifndef TODOMODEL_H
+#define TODOMODEL_H
+
+#include <QAbstractListModel>
 #include <QSqlDatabase>
 #include <QSqlQuery>
-#include <QSqlError>
-#include <QDebug>
 
-class UserDatabase {
-public:
-    UserDatabase() {
-        // Setup database
-        db = QSqlDatabase::addDatabase("QSQLITE");
-        db.setDatabaseName("users.db");
-        
-        if (!db.open()) {
-            qFatal("Cannot open database: %s", 
-                   qPrintable(db.lastError().text()));
-        }
-        
-        createTable();
-    }
-    
-    ~UserDatabase() {
-        db.close();
-    }
-    
-    void createTable() {
-        QSqlQuery query;
-        query.exec("CREATE TABLE IF NOT EXISTS users ("
-                   "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                   "name TEXT NOT NULL, "
-                   "email TEXT UNIQUE NOT NULL, "
-                   "age INTEGER)");
-    }
-    
-    // CREATE
-    bool addUser(const QString &name, const QString &email, int age) {
-        QSqlQuery query;
-        query.prepare("INSERT INTO users (name, email, age) "
-                      "VALUES (:name, :email, :age)");
-        query.bindValue(":name", name);
-        query.bindValue(":email", email);
-        query.bindValue(":age", age);
-        
-        if (!query.exec()) {
-            qDebug() << "Insert failed:" << query.lastError().text();
-            return false;
-        }
-        
-        qDebug() << "User added with ID:" << query.lastInsertId().toInt();
-        return true;
-    }
-    
-    // READ
-    void listAllUsers() {
-        QSqlQuery query("SELECT * FROM users");
-        
-        qDebug() << "\n=== All Users ===";
-        while (query.next()) {
-            int id = query.value("id").toInt();
-            QString name = query.value("name").toString();
-            QString email = query.value("email").toString();
-            int age = query.value("age").toInt();
-            
-            qDebug() << QString("ID: %1, Name: %2, Email: %3, Age: %4")
-                        .arg(id).arg(name).arg(email).arg(age);
-        }
-    }
-    
-    // READ - Single user
-    bool getUser(int id, QString &name, QString &email, int &age) {
-        QSqlQuery query;
-        query.prepare("SELECT * FROM users WHERE id = ?");
-        query.addBindValue(id);
-        
-        if (query.exec() && query.next()) {
-            name = query.value("name").toString();
-            email = query.value("email").toString();
-            age = query.value("age").toInt();
-            return true;
-        }
-        return false;
-    }
-    
-    // UPDATE
-    bool updateUser(int id, const QString &name, const QString &email, int age) {
-        QSqlQuery query;
-        query.prepare("UPDATE users SET name = ?, email = ?, age = ? "
-                      "WHERE id = ?");
-        query.addBindValue(name);
-        query.addBindValue(email);
-        query.addBindValue(age);
-        query.addBindValue(id);
-        
-        if (!query.exec()) {
-            qDebug() << "Update failed:" << query.lastError().text();
-            return false;
-        }
-        
-        qDebug() << "Rows updated:" << query.numRowsAffected();
-        return query.numRowsAffected() > 0;
-    }
-    
-    // DELETE
-    bool deleteUser(int id) {
-        QSqlQuery query;
-        query.prepare("DELETE FROM users WHERE id = ?");
-        query.addBindValue(id);
-        
-        if (!query.exec()) {
-            qDebug() << "Delete failed:" << query.lastError().text();
-            return false;
-        }
-        
-        return query.numRowsAffected() > 0;
-    }
-    
-    // SEARCH
-    void searchUsers(const QString &keyword) {
-        QSqlQuery query;
-        query.prepare("SELECT * FROM users WHERE name LIKE ? OR email LIKE ?");
-        QString pattern = "%" + keyword + "%";
-        query.addBindValue(pattern);
-        query.addBindValue(pattern);
-        
-        query.exec();
-        
-        qDebug() << "\n=== Search Results for:" << keyword << "===";
-        while (query.next()) {
-            qDebug() << query.value("name").toString() 
-                     << "-" << query.value("email").toString();
-        }
-    }
-
-private:
-    QSqlDatabase db;
+struct TodoItem {
+    int id;
+    QString title;
+    bool completed;
 };
 
-int main(int argc, char *argv[])
+class TodoModel : public QAbstractListModel
 {
-    QCoreApplication app(argc, argv);
+    Q_OBJECT
+    Q_PROPERTY(int count READ rowCount NOTIFY countChanged)
     
-    UserDatabase userDb;
+public:
+    enum TodoRoles {
+        IdRole = Qt::UserRole + 1,
+        TitleRole,
+        CompletedRole
+    };
     
-    // CREATE
-    userDb.addUser("Alice Johnson", "alice@example.com", 28);
-    userDb.addUser("Bob Smith", "bob@example.com", 35);
-    userDb.addUser("Charlie Brown", "charlie@example.com", 42);
+    explicit TodoModel(QObject *parent = nullptr);
     
-    // READ
-    userDb.listAllUsers();
+    // QAbstractItemModel interface
+    int rowCount(const QModelIndex &parent = QModelIndex()) const override;
+    QVariant data(const QModelIndex &index, int role) const override;
+    QHash<int, QByteArray> roleNames() const override;
     
-    // UPDATE
-    userDb.updateUser(1, "Alice Williams", "alice.w@example.com", 29);
+    // Todo operations
+    Q_INVOKABLE bool addTodo(const QString &title);
+    Q_INVOKABLE bool removeTodo(int index);
+    Q_INVOKABLE bool toggleCompleted(int index);
+    Q_INVOKABLE bool updateTitle(int index, const QString &newTitle);
+    Q_INVOKABLE void refresh();
     
-    // SEARCH
-    userDb.searchUsers("Alice");
+signals:
+    void countChanged();
+    void errorOccurred(const QString &message);
     
-    // DELETE
-    userDb.deleteUser(2);
+private:
+    void loadTodos();
+    bool initDatabase();
     
-    userDb.listAllUsers();
-    
-    return 0;
-}
+    QList<TodoItem> m_todos;
+    QSqlDatabase m_db;
+};
+
+#endif // TODOMODEL_H
 ```
 
-**Compile:**
-```bash
-qmake -project
-qmake
-make
-```
-
-**Add to .pro file:**
-```qmake
-QT += sql
-```
-
----
-
-## Example 2: Transaction with Error Handling
+### 📄 todomodel.cpp
 
 ```cpp
-#include <QSqlDatabase>
-#include <QSqlQuery>
+#include "todomodel.h"
 #include <QSqlError>
 #include <QDebug>
 
-class BankAccount {
-public:
-    static bool transfer(int fromAccount, int toAccount, double amount) {
-        QSqlDatabase db = QSqlDatabase::database();
-        
-        // Check if database supports transactions
-        if (!db.driver()->hasFeature(QSqlDriver::Transactions)) {
-            qWarning("Database doesn't support transactions!");
-            return false;
-        }
-        
-        // Start transaction
-        if (!db.transaction()) {
-            qDebug() << "Failed to start transaction:" 
-                     << db.lastError().text();
-            return false;
-        }
-        
-        QSqlQuery query;
-        bool success = true;
-        
-        // Step 1: Withdraw from source account
-        query.prepare("UPDATE accounts SET balance = balance - :amount "
-                      "WHERE id = :id AND balance >= :amount");
-        query.bindValue(":amount", amount);
-        query.bindValue(":id", fromAccount);
-        
-        if (!query.exec() || query.numRowsAffected() == 0) {
-            qDebug() << "Withdrawal failed:" << query.lastError().text();
-            success = false;
-        }
-        
-        // Step 2: Deposit to destination account (only if step 1 succeeded)
-        if (success) {
-            query.prepare("UPDATE accounts SET balance = balance + :amount "
-                          "WHERE id = :id");
-            query.bindValue(":amount", amount);
-            query.bindValue(":id", toAccount);
-            
-            if (!query.exec()) {
-                qDebug() << "Deposit failed:" << query.lastError().text();
-                success = false;
-            }
-        }
-        
-        // Commit or rollback
-        if (success) {
-            if (db.commit()) {
-                qDebug() << "Transfer successful!";
-                return true;
-            } else {
-                qDebug() << "Commit failed:" << db.lastError().text();
-            }
-        }
-        
-        // Rollback on any failure
-        db.rollback();
-        qDebug() << "Transaction rolled back";
+TodoModel::TodoModel(QObject *parent)
+    : QAbstractListModel(parent)
+{
+    if (initDatabase()) {
+        loadTodos();
+    }
+}
+
+bool TodoModel::initDatabase()
+{
+    m_db = QSqlDatabase::addDatabase("QSQLITE");
+    m_db.setDatabaseName("todos.db");
+    
+    if (!m_db.open()) {
+        emit errorOccurred("Cannot open database: " + m_db.lastError().text());
         return false;
     }
-};
+    
+    QSqlQuery query(m_db);
+    bool success = query.exec(
+        "CREATE TABLE IF NOT EXISTS todos ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "title TEXT NOT NULL, "
+        "completed INTEGER DEFAULT 0)");
+    
+    if (!success) {
+        emit errorOccurred("Cannot create table: " + query.lastError().text());
+        return false;
+    }
+    
+    return true;
+}
 
-// Usage
-int main() {
-    // Setup
-    QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE");
-    db.setDatabaseName("bank.db");
-    db.open();
+void TodoModel::loadTodos()
+{
+    beginResetModel();
+    m_todos.clear();
     
-    QSqlQuery query;
-    query.exec("CREATE TABLE IF NOT EXISTS accounts ("
-               "id INTEGER PRIMARY KEY, "
-               "name TEXT, "
-               "balance REAL)");
+    QSqlQuery query("SELECT id, title, completed FROM todos ORDER BY id", m_db);
     
-    query.exec("INSERT INTO accounts VALUES (1, 'Alice', 1000.0)");
-    query.exec("INSERT INTO accounts VALUES (2, 'Bob', 500.0)");
-    
-    // Transfer money
-    BankAccount::transfer(1, 2, 100.0);  // Alice -> Bob: $100
-    
-    // Verify
-    query.exec("SELECT * FROM accounts");
     while (query.next()) {
-        qDebug() << query.value("name").toString() 
-                 << ": $" << query.value("balance").toDouble();
+        TodoItem item;
+        item.id = query.value(0).toInt();
+        item.title = query.value(1).toString();
+        item.completed = query.value(2).toBool();
+        m_todos.append(item);
     }
     
-    return 0;
+    endResetModel();
+    emit countChanged();
+}
+
+int TodoModel::rowCount(const QModelIndex &parent) const
+{
+    Q_UNUSED(parent);
+    return m_todos.count();
+}
+
+QVariant TodoModel::data(const QModelIndex &index, int role) const
+{
+    if (!index.isValid() || index.row() >= m_todos.count())
+        return QVariant();
+    
+    const TodoItem &item = m_todos[index.row()];
+    
+    switch (role) {
+    case IdRole: return item.id;
+    case TitleRole: return item.title;
+    case CompletedRole: return item.completed;
+    }
+    
+    return QVariant();
+}
+
+QHash<int, QByteArray> TodoModel::roleNames() const
+{
+    QHash<int, QByteArray> roles;
+    roles[IdRole] = "todoId";
+    roles[TitleRole] = "title";
+    roles[CompletedRole] = "completed";
+    return roles;
+}
+
+bool TodoModel::addTodo(const QString &title)
+{
+    if (title.isEmpty()) {
+        emit errorOccurred("Title cannot be empty");
+        return false;
+    }
+    
+    QSqlQuery query(m_db);
+    query.prepare("INSERT INTO todos (title, completed) VALUES (?, 0)");
+    query.addBindValue(title);
+    
+    if (!query.exec()) {
+        emit errorOccurred("Failed to add todo: " + query.lastError().text());
+        return false;
+    }
+    
+    loadTodos();
+    return true;
+}
+
+bool TodoModel::removeTodo(int index)
+{
+    if (index < 0 || index >= m_todos.count())
+        return false;
+    
+    int todoId = m_todos[index].id;
+    
+    QSqlQuery query(m_db);
+    query.prepare("DELETE FROM todos WHERE id = ?");
+    query.addBindValue(todoId);
+    
+    if (!query.exec()) {
+        emit errorOccurred("Failed to delete todo: " + query.lastError().text());
+        return false;
+    }
+    
+    loadTodos();
+    return true;
+}
+
+bool TodoModel::toggleCompleted(int index)
+{
+    if (index < 0 || index >= m_todos.count())
+        return false;
+    
+    int todoId = m_todos[index].id;
+    bool newCompleted = !m_todos[index].completed;
+    
+    QSqlQuery query(m_db);
+    query.prepare("UPDATE todos SET completed = ? WHERE id = ?");
+    query.addBindValue(newCompleted ? 1 : 0);
+    query.addBindValue(todoId);
+    
+    if (!query.exec()) {
+        emit errorOccurred("Failed to update todo: " + query.lastError().text());
+        return false;
+    }
+    
+    loadTodos();
+    return true;
+}
+
+bool TodoModel::updateTitle(int index, const QString &newTitle)
+{
+    if (index < 0 || index >= m_todos.count() || newTitle.isEmpty())
+        return false;
+    
+    int todoId = m_todos[index].id;
+    
+    QSqlQuery query(m_db);
+    query.prepare("UPDATE todos SET title = ? WHERE id = ?");
+    query.addBindValue(newTitle);
+    query.addBindValue(todoId);
+    
+    if (!query.exec()) {
+        emit errorOccurred("Failed to update todo: " + query.lastError().text());
+        return false;
+    }
+    
+    loadTodos();
+    return true;
+}
+
+void TodoModel::refresh()
+{
+    loadTodos();
 }
 ```
 
----
+### 📄 main.qml
 
-## Example 3: Batch Insert for Performance
+```qml
+import QtQuick 2.15
+import QtQuick.Controls 2.15
+import QtQuick.Layouts 1.15
 
-```cpp
-#include <QSqlDatabase>
-#include <QSqlQuery>
-#include <QElapsedTimer>
-#include <QDebug>
-
-class BatchInsertDemo {
-public:
-    // Slow method: Individual inserts
-    static void slowInsert(int count) {
-        QElapsedTimer timer;
-        timer.start();
-        
-        QSqlQuery query;
-        for (int i = 0; i < count; ++i) {
-            query.prepare("INSERT INTO users (name, age) VALUES (?, ?)");
-            query.addBindValue(QString("User%1").arg(i));
-            query.addBindValue(20 + (i % 50));
-            query.exec();
-        }
-        
-        qDebug() << "Slow insert" << count << "rows:" 
-                 << timer.elapsed() << "ms";
-    }
+ApplicationWindow {
+    visible: true
+    width: 600
+    height: 800
+    title: "Todo App - Qt SQL"
     
-    // Fast method: Transaction + prepared statement
-    static void fastInsert(int count) {
-        QElapsedTimer timer;
-        timer.start();
+    ColumnLayout {
+        anchors.fill: parent
+        anchors.margins: 20
+        spacing: 15
         
-        QSqlDatabase db = QSqlDatabase::database();
-        db.transaction();
-        
-        QSqlQuery query;
-        query.prepare("INSERT INTO users (name, age) VALUES (?, ?)");
-        
-        for (int i = 0; i < count; ++i) {
-            query.addBindValue(QString("User%1").arg(i));
-            query.addBindValue(20 + (i % 50));
-            query.exec();
-        }
-        
-        db.commit();
-        
-        qDebug() << "Fast insert" << count << "rows:" 
-                 << timer.elapsed() << "ms";
-    }
-    
-    // Ultra-fast method: Batch execution
-    static void batchInsert(int count) {
-        QElapsedTimer timer;
-        timer.start();
-        
-        QSqlQuery query;
-        query.prepare("INSERT INTO users (name, age) VALUES (?, ?)");
-        
-        QVariantList names;
-        QVariantList ages;
-        
-        for (int i = 0; i < count; ++i) {
-            names << QString("User%1").arg(i);
-            ages << (20 + (i % 50));
-        }
-        
-        query.addBindValue(names);
-        query.addBindValue(ages);
-        
-        if (!query.execBatch()) {
-            qDebug() << "Batch insert failed:" << query.lastError().text();
-        }
-        
-        qDebug() << "Batch insert" << count << "rows:" 
-                 << timer.elapsed() << "ms";
-    }
-};
-
-int main() {
-    QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE");
-    db.setDatabaseName(":memory:");  // In-memory database
-    db.open();
-    
-    QSqlQuery query;
-    query.exec("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, "
-               "name TEXT, age INTEGER)");
-    
-    // Compare performance
-    BatchInsertDemo::slowInsert(1000);
-    
-    query.exec("DELETE FROM users");
-    
-    BatchInsertDemo::fastInsert(1000);
-    
-    query.exec("DELETE FROM users");
-    
-    BatchInsertDemo::batchInsert(1000);
-    
-    return 0;
-}
-
-// Typical output:
-// Slow insert 1000 rows: 850 ms
-// Fast insert 1000 rows: 45 ms
-// Batch insert 1000 rows: 12 ms
-```
-
----
-
-## Example 4: QSqlTableModel with QTableView
-
-```cpp
-#include <QApplication>
-#include <QTableView>
-#include <QSqlTableModel>
-#include <QSqlDatabase>
-#include <QSqlQuery>
-#include <QVBoxLayout>
-#include <QPushButton>
-#include <QHeaderView>
-#include <QMessageBox>
-
-class DatabaseTableWidget : public QWidget {
-    Q_OBJECT
-    
-public:
-    DatabaseTableWidget(QWidget *parent = nullptr) : QWidget(parent) {
-        setupDatabase();
-        setupUI();
-        loadData();
-    }
-
-private:
-    void setupDatabase() {
-        db = QSqlDatabase::addDatabase("QSQLITE");
-        db.setDatabaseName("employees.db");
-        
-        if (!db.open()) {
-            QMessageBox::critical(this, "Error", 
-                                  "Cannot open database: " + db.lastError().text());
-            return;
-        }
-        
-        // Create and populate table
-        QSqlQuery query;
-        query.exec("CREATE TABLE IF NOT EXISTS employees ("
-                   "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                   "name TEXT NOT NULL, "
-                   "department TEXT, "
-                   "salary REAL)");
-        
-        // Add sample data if table is empty
-        query.exec("SELECT COUNT(*) FROM employees");
-        if (query.next() && query.value(0).toInt() == 0) {
-            query.exec("INSERT INTO employees (name, department, salary) VALUES "
-                       "('Alice Johnson', 'Engineering', 85000), "
-                       "('Bob Smith', 'Marketing', 65000), "
-                       "('Charlie Brown', 'Engineering', 92000), "
-                       "('Diana Prince', 'HR', 70000)");
-        }
-    }
-    
-    void setupUI() {
-        // Create model
-        model = new QSqlTableModel(this, db);
-        model->setTable("employees");
-        model->setEditStrategy(QSqlTableModel::OnManualSubmit);
-        
-        // Set headers
-        model->setHeaderData(0, Qt::Horizontal, "ID");
-        model->setHeaderData(1, Qt::Horizontal, "Name");
-        model->setHeaderData(2, Qt::Horizontal, "Department");
-        model->setHeaderData(3, Qt::Horizontal, "Salary");
-        
-        // Create view
-        view = new QTableView;
-        view->setModel(model);
-        view->horizontalHeader()->setStretchLastSection(true);
-        view->setAlternatingRowColors(true);
-        view->setSelectionBehavior(QAbstractItemView::SelectRows);
-        
-        // Create buttons
-        QPushButton *addBtn = new QPushButton("Add Row");
-        QPushButton *deleteBtn = new QPushButton("Delete Row");
-        QPushButton *submitBtn = new QPushButton("Save Changes");
-        QPushButton *revertBtn = new QPushButton("Cancel Changes");
-        QPushButton *filterBtn = new QPushButton("Filter Engineering");
-        QPushButton *clearFilterBtn = new QPushButton("Clear Filter");
-        
-        connect(addBtn, &QPushButton::clicked, this, &DatabaseTableWidget::addRow);
-        connect(deleteBtn, &QPushButton::clicked, this, &DatabaseTableWidget::deleteRow);
-        connect(submitBtn, &QPushButton::clicked, this, &DatabaseTableWidget::submitChanges);
-        connect(revertBtn, &QPushButton::clicked, this, &DatabaseTableWidget::revertChanges);
-        connect(filterBtn, &QPushButton::clicked, this, &DatabaseTableWidget::applyFilter);
-        connect(clearFilterBtn, &QPushButton::clicked, this, &DatabaseTableWidget::clearFilter);
-        
-        // Layout
-        QVBoxLayout *layout = new QVBoxLayout(this);
-        layout->addWidget(view);
-        
-        QHBoxLayout *btnLayout = new QHBoxLayout;
-        btnLayout->addWidget(addBtn);
-        btnLayout->addWidget(deleteBtn);
-        btnLayout->addWidget(submitBtn);
-        btnLayout->addWidget(revertBtn);
-        btnLayout->addWidget(filterBtn);
-        btnLayout->addWidget(clearFilterBtn);
-        
-        layout->addLayout(btnLayout);
-    }
-    
-    void loadData() {
-        if (!model->select()) {
-            QMessageBox::critical(this, "Error", 
-                                  "Cannot load data: " + model->lastError().text());
-        }
-    }
-
-private slots:
-    void addRow() {
-        int row = model->rowCount();
-        model->insertRow(row);
-        
-        // Set default values
-        model->setData(model->index(row, 1), "New Employee");
-        model->setData(model->index(row, 2), "Engineering");
-        model->setData(model->index(row, 3), 50000);
-        
-        // Scroll to new row
-        view->scrollToBottom();
-        view->selectRow(row);
-    }
-    
-    void deleteRow() {
-        QModelIndexList selection = view->selectionModel()->selectedRows();
-        
-        if (selection.isEmpty()) {
-            QMessageBox::warning(this, "Warning", "Please select a row to delete");
-            return;
-        }
-        
-        // Delete selected rows (from bottom to top to avoid index issues)
-        QList<int> rows;
-        for (const QModelIndex &index : selection) {
-            rows.append(index.row());
-        }
-        std::sort(rows.begin(), rows.end(), std::greater<int>());
-        
-        for (int row : rows) {
-            model->removeRow(row);
-        }
-    }
-    
-    void submitChanges() {
-        if (model->submitAll()) {
-            QMessageBox::information(this, "Success", "Changes saved successfully");
-        } else {
-            QMessageBox::critical(this, "Error", 
-                                  "Failed to save: " + model->lastError().text());
-            model->revertAll();
-        }
-    }
-    
-    void revertChanges() {
-        model->revertAll();
-        QMessageBox::information(this, "Reverted", "All changes cancelled");
-    }
-    
-    void applyFilter() {
-        model->setFilter("department = 'Engineering'");
-        model->select();
-    }
-    
-    void clearFilter() {
-        model->setFilter("");
-        model->select();
-    }
-
-private:
-    QSqlDatabase db;
-    QSqlTableModel *model;
-    QTableView *view;
-};
-
-int main(int argc, char *argv[]) {
-    QApplication app(argc, argv);
-    
-    DatabaseTableWidget window;
-    window.resize(800, 400);
-    window.setWindowTitle("Employee Database");
-    window.show();
-    
-    return app.exec();
-}
-
-#include "main.moc"
-```
-
----
-
-## Example 5: Multi-threaded Database Access
-
-```cpp
-#include <QThread>
-#include <QSqlDatabase>
-#include <QSqlQuery>
-#include <QDebug>
-#include <QMutex>
-
-class DatabaseWorker : public QThread {
-    Q_OBJECT
-    
-public:
-    DatabaseWorker(int workerId, QObject *parent = nullptr)
-        : QThread(parent), m_workerId(workerId) {}
-    
-protected:
-    void run() override {
-        // IMPORTANT: Each thread needs its own connection
-        QString connectionName = QString("Worker_%1").arg(m_workerId);
-        
-        QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connectionName);
-        db.setDatabaseName("shared.db");
-        
-        if (!db.open()) {
-            qDebug() << "Worker" << m_workerId << "failed to open DB";
-            return;
-        }
-        
-        // Do work
-        QSqlQuery query(db);
-        for (int i = 0; i < 10; ++i) {
-            query.prepare("INSERT INTO logs (worker_id, message, timestamp) "
-                          "VALUES (?, ?, datetime('now'))");
-            query.addBindValue(m_workerId);
-            query.addBindValue(QString("Message %1").arg(i));
+        // Header
+        Rectangle {
+            Layout.fillWidth: true
+            height: 80
+            color: "#2196F3"
+            radius: 10
             
-            if (query.exec()) {
-                qDebug() << "Worker" << m_workerId << "inserted message" << i;
-            } else {
-                qDebug() << "Worker" << m_workerId << "error:" 
-                         << query.lastError().text();
-            }
-            
-            // Simulate work
-            QThread::msleep(100);
-        }
-        
-        // Cleanup: Close and remove connection
-        db.close();
-        QSqlDatabase::removeDatabase(connectionName);
-        
-        qDebug() << "Worker" << m_workerId << "finished";
-    }
-    
-private:
-    int m_workerId;
-};
-
-int main(int argc, char *argv[]) {
-    QCoreApplication app(argc, argv);
-    
-    // Setup main database
-    {
-        QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "MainConnection");
-        db.setDatabaseName("shared.db");
-        db.open();
-        
-        QSqlQuery query(db);
-        query.exec("CREATE TABLE IF NOT EXISTS logs ("
-                   "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                   "worker_id INTEGER, "
-                   "message TEXT, "
-                   "timestamp TEXT)");
-        query.exec("DELETE FROM logs");  // Clear old data
-        
-        db.close();
-        QSqlDatabase::removeDatabase("MainConnection");
-    }
-    
-    // Start worker threads
-    QList<DatabaseWorker*> workers;
-    for (int i = 0; i < 3; ++i) {
-        DatabaseWorker *worker = new DatabaseWorker(i);
-        workers.append(worker);
-        worker->start();
-    }
-    
-    // Wait for all threads
-    for (DatabaseWorker *worker : workers) {
-        worker->wait();
-        delete worker;
-    }
-    
-    // Read results
-    {
-        QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "ReadConnection");
-        db.setDatabaseName("shared.db");
-        db.open();
-        
-        QSqlQuery query(db);
-        query.exec("SELECT * FROM logs ORDER BY timestamp");
-        
-        qDebug() << "\n=== Final Results ===";
-        while (query.next()) {
-            qDebug() << QString("Worker %1: %2 at %3")
-                        .arg(query.value("worker_id").toInt())
-                        .arg(query.value("message").toString())
-                        .arg(query.value("timestamp").toString());
-        }
-        
-        db.close();
-    }
-    
-    return 0;
-}
-
-#include "main.moc"
-```
-
----
-
-## Example 6: Custom QSqlQueryModel
-
-```cpp
-#include <QSqlQueryModel>
-#include <QColor>
-#include <QFont>
-
-class CustomQueryModel : public QSqlQueryModel {
-public:
-    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override {
-        // Get original data
-        QVariant value = QSqlQueryModel::data(index, role);
-        
-        if (role == Qt::DisplayRole) {
-            // Format salary column with $ sign
-            if (index.column() == 3) {  // Salary column
-                return QString("$%1").arg(value.toDouble(), 0, 'f', 2);
-            }
-        }
-        
-        if (role == Qt::BackgroundRole) {
-            // Highlight high salaries
-            if (index.column() == 3 && value.toDouble() > 80000) {
-                return QColor(Qt::green).lighter(170);
-            }
-        }
-        
-        if (role == Qt::ForegroundRole) {
-            // Red text for low salaries
-            if (index.column() == 3 && value.toDouble() < 60000) {
-                return QColor(Qt::red);
-            }
-        }
-        
-        if (role == Qt::FontRole) {
-            // Bold font for department column
-            if (index.column() == 2) {
-                QFont font;
-                font.setBold(true);
-                return font;
-            }
-        }
-        
-        if (role == Qt::TextAlignmentRole) {
-            // Right-align salary
-            if (index.column() == 3) {
-                return int(Qt::AlignRight | Qt::AlignVCenter);
-            }
-        }
-        
-        return value;
-    }
-};
-
-// Usage
-int main(int argc, char *argv[]) {
-    QApplication app(argc, argv);
-    
-    QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE");
-    db.setDatabaseName("employees.db");
-    db.open();
-    
-    CustomQueryModel *model = new CustomQueryModel;
-    model->setQuery("SELECT id, name, department, salary FROM employees");
-    
-    QTableView *view = new QTableView;
-    view->setModel(model);
-    view->show();
-    
-    return app.exec();
-}
-```
-
----
-
-## Example 7: Connection Pool Manager
-
-```cpp
-#include <QSqlDatabase>
-#include <QQueue>
-#include <QMutex>
-#include <QWaitCondition>
-#include <QDebug>
-
-class ConnectionPool {
-public:
-    static ConnectionPool& instance() {
-        static ConnectionPool instance;
-        return instance;
-    }
-    
-    QSqlDatabase getConnection() {
-        QMutexLocker locker(&mutex);
-        
-        // Wait if no connections available
-        while (availableConnections.isEmpty() && 
-               activeConnections >= maxConnections) {
-            condition.wait(&mutex);
-        }
-        
-        QSqlDatabase db;
-        
-        if (!availableConnections.isEmpty()) {
-            // Reuse existing connection
-            QString connName = availableConnections.dequeue();
-            db = QSqlDatabase::database(connName);
-        } else {
-            // Create new connection
-            QString connName = QString("Connection_%1").arg(connectionCounter++);
-            db = QSqlDatabase::addDatabase("QSQLITE", connName);
-            db.setDatabaseName("pooled.db");
-            
-            if (!db.open()) {
-                qDebug() << "Failed to create connection:" 
-                         << db.lastError().text();
-                return QSqlDatabase();
-            }
-        }
-        
-        activeConnections++;
-        return db;
-    }
-    
-    void releaseConnection(QSqlDatabase &db) {
-        QMutexLocker locker(&mutex);
-        
-        if (db.isValid()) {
-            availableConnections.enqueue(db.connectionName());
-            activeConnections--;
-            condition.wakeOne();
-        }
-    }
-    
-    void setMaxConnections(int max) {
-        maxConnections = max;
-    }
-
-private:
-    ConnectionPool() : maxConnections(5), activeConnections(0), connectionCounter(0) {}
-    
-    QQueue<QString> availableConnections;
-    QMutex mutex;
-    QWaitCondition condition;
-    int maxConnections;
-    int activeConnections;
-    int connectionCounter;
-};
-
-// RAII wrapper for automatic release
-class ScopedConnection {
-public:
-    ScopedConnection() {
-        db = ConnectionPool::instance().getConnection();
-    }
-    
-    ~ScopedConnection() {
-        ConnectionPool::instance().releaseConnection(db);
-    }
-    
-    QSqlDatabase& database() { return db; }
-    
-private:
-    QSqlDatabase db;
-};
-
-// Usage
-void performDatabaseWork() {
-    ScopedConnection conn;
-    QSqlQuery query(conn.database());
-    
-    query.exec("SELECT * FROM users");
-    while (query.next()) {
-        // Process...
-    }
-    
-    // Connection automatically released when function ends
-}
-```
-
----
-
-## Example 8: JSON Export/Import
-
-```cpp
-#include <QSqlQuery>
-#include <QJsonDocument>
-#include <QJsonArray>
-#include <QJsonObject>
-#include <QFile>
-
-class JsonExporter {
-public:
-    static bool exportToJson(const QString &tableName, const QString &fileName) {
-        QSqlQuery query(QString("SELECT * FROM %1").arg(tableName));
-        
-        QJsonArray array;
-        
-        while (query.next()) {
-            QJsonObject obj;
-            QSqlRecord record = query.record();
-            
-            for (int i = 0; i < record.count(); ++i) {
-                QString fieldName = record.fieldName(i);
-                QVariant value = record.value(i);
+            ColumnLayout {
+                anchors.centerIn: parent
                 
-                // Convert QVariant to JSON value
-                if (value.isNull()) {
-                    obj[fieldName] = QJsonValue::Null;
-                } else {
-                    obj[fieldName] = QJsonValue::fromVariant(value);
+                Label {
+                    text: "My Todos"
+                    font.pixelSize: 28
+                    font.bold: true
+                    color: "white"
+                    Layout.alignment: Qt.AlignHCenter
+                }
+                
+                Label {
+                    text: todoModel.count + " tasks"
+                    font.pixelSize: 14
+                    color: "white"
+                    opacity: 0.8
+                    Layout.alignment: Qt.AlignHCenter
+                }
+            }
+        }
+        
+        // Add todo input
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 10
+            
+            TextField {
+                id: todoInput
+                Layout.fillWidth: true
+                placeholderText: "What needs to be done?"
+                font.pixelSize: 16
+                
+                Keys.onReturnPressed: addButton.clicked()
+            }
+            
+            Button {
+                id: addButton
+                text: "Add"
+                highlighted: true
+                enabled: todoInput.text.length > 0
+                
+                onClicked: {
+                    if (todoModel.addTodo(todoInput.text)) {
+                        todoInput.text = ""
+                    }
+                }
+            }
+        }
+        
+        // Todo list
+        ListView {
+            id: listView
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            spacing: 8
+            clip: true
+            
+            model: todoModel
+            
+            delegate: Rectangle {
+                width: listView.width
+                height: 70
+                color: "#f5f5f5"
+                radius: 8
+                border.color: "#ddd"
+                border.width: 1
+                
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    spacing: 10
+                    
+                    // Checkbox
+                    CheckBox {
+                        checked: model.completed
+                        onClicked: todoModel.toggleCompleted(index)
+                    }
+                    
+                    // Title
+                    Label {
+                        Layout.fillWidth: true
+                        text: model.title
+                        font.pixelSize: 16
+                        font.strikeout: model.completed
+                        opacity: model.completed ? 0.5 : 1.0
+                        wrapMode: Text.WordWrap
+                    }
+                    
+                    // Edit button
+                    Button {
+                        text: "✏️"
+                        flat: true
+                        onClicked: {
+                            editDialog.editIndex = index
+                            editDialog.editText = model.title
+                            editDialog.open()
+                        }
+                    }
+                    
+                    // Delete button
+                    Button {
+                        text: "🗑️"
+                        flat: true
+                        onClicked: {
+                            deleteDialog.deleteIndex = index
+                            deleteDialog.open()
+                        }
+                    }
                 }
             }
             
-            array.append(obj);
+            // Empty state
+            Label {
+                anchors.centerIn: parent
+                text: "No todos yet!\nAdd one above to get started 🚀"
+                font.pixelSize: 18
+                color: "#999"
+                horizontalAlignment: Text.AlignHCenter
+                visible: listView.count === 0
+            }
         }
         
-        QJsonDocument doc(array);
-        
-        QFile file(fileName);
-        if (!file.open(QIODevice::WriteOnly)) {
-            qDebug() << "Cannot open file for writing";
-            return false;
+        // Stats
+        Rectangle {
+            Layout.fillWidth: true
+            height: 50
+            color: "#f0f0f0"
+            radius: 8
+            
+            RowLayout {
+                anchors.fill: parent
+                anchors.margins: 10
+                
+                Label {
+                    text: "Total: " + todoModel.count
+                    font.pixelSize: 14
+                }
+                
+                Item { Layout.fillWidth: true }
+                
+                Label {
+                    text: {
+                        var completed = 0;
+                        for (var i = 0; i < todoModel.count; i++) {
+                            if (todoModel.data(todoModel.index(i, 0), 258)) // CompletedRole
+                                completed++;
+                        }
+                        return "Completed: " + completed;
+                    }
+                    font.pixelSize: 14
+                    color: "#4CAF50"
+                }
+            }
         }
-        
-        file.write(doc.toJson(QJsonDocument::Indented));
-        return true;
     }
     
-    static bool importFromJson(const QString &tableName, const QString &fileName) {
-        QFile file(fileName);
-        if (!file.open(QIODevice::ReadOnly)) {
-            qDebug() << "Cannot open file for reading";
-            return false;
+    // Edit Dialog
+    Dialog {
+        id: editDialog
+        title: "Edit Todo"
+        width: 400
+        standardButtons: Dialog.Save | Dialog.Cancel
+        
+        property int editIndex: -1
+        property alias editText: editField.text
+        
+        TextField {
+            id: editField
+            width: parent.width
+            placeholderText: "Enter new title"
         }
         
-        QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
-        QJsonArray array = doc.array();
-        
-        QSqlDatabase db = QSqlDatabase::database();
-        db.transaction();
-        
-        for (const QJsonValue &value : array) {
-            QJsonObject obj = value.toObject();
-            
-            // Build INSERT statement
-            QStringList fields;
-            QStringList placeholders;
-            QVariantList values;
-            
-            for (auto it = obj.begin(); it != obj.end(); ++it) {
-                fields << it.key();
-                placeholders << "?";
-                values << it.value().toVariant();
-            }
-            
-            QString sql = QString("INSERT INTO %1 (%2) VALUES (%3)")
-                         .arg(tableName)
-                         .arg(fields.join(", "))
-                         .arg(placeholders.join(", "));
-            
-            QSqlQuery query;
-            query.prepare(sql);
-            for (const QVariant &v : values) {
-                query.addBindValue(v);
-            }
-            
-            if (!query.exec()) {
-                qDebug() << "Import failed:" << query.lastError().text();
-                db.rollback();
-                return false;
+        onAccepted: {
+            if (editField.text.length > 0) {
+                todoModel.updateTitle(editIndex, editField.text)
             }
         }
-        
-        db.commit();
-        return true;
     }
-};
-
-// Usage
-int main() {
-    QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE");
-    db.setDatabaseName("data.db");
-    db.open();
     
-    // Export
-    JsonExporter::exportToJson("employees", "employees.json");
+    // Delete Confirmation Dialog
+    Dialog {
+        id: deleteDialog
+        title: "Confirm Delete"
+        width: 400
+        standardButtons: Dialog.Yes | Dialog.No
+        
+        property int deleteIndex: -1
+        
+        Label {
+            text: "Are you sure you want to delete this todo?"
+        }
+        
+        onAccepted: {
+            todoModel.removeTodo(deleteIndex)
+        }
+    }
     
-    // Import
-    JsonExporter::importFromJson("employees_backup", "employees.json");
+    // Error toast
+    Popup {
+        id: errorPopup
+        anchors.centerIn: parent
+        width: 300
+        height: 100
+        modal: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        
+        property alias message: errorLabel.text
+        
+        Rectangle {
+            anchors.fill: parent
+            color: "#f44336"
+            radius: 8
+            
+            Label {
+                id: errorLabel
+                anchors.centerIn: parent
+                color: "white"
+                font.pixelSize: 14
+                wrapMode: Text.WordWrap
+            }
+        }
+    }
     
-    return 0;
+    Connections {
+        target: todoModel
+        function onErrorOccurred(message) {
+            errorPopup.message = message
+            errorPopup.open()
+        }
+    }
 }
 ```
 
----
+### 📄 main.cpp
 
-## 🎯 Complete .pro File Example
+```cpp
+#include <QGuiApplication>
+#include <QQmlApplicationEngine>
+#include <QQmlContext>
+#include "todomodel.h"
 
-```qmake
-QT += core sql widgets
-CONFIG += c++17
-
-SOURCES += main.cpp
-HEADERS += 
-
-# SQLite is built-in, but for other databases:
-# MySQL
-# LIBS += -L/usr/lib/mysql -lmysqlclient
-
-# PostgreSQL  
-# LIBS += -L/usr/lib -lpq
-
-# Output
-TARGET = DatabaseApp
-TEMPLATE = app
+int main(int argc, char *argv[])
+{
+    QGuiApplication app(argc, argv);
+    
+    // Set application info
+    app.setOrganizationName("MyCompany");
+    app.setApplicationName("TodoApp");
+    
+    // Create model
+    TodoModel todoModel;
+    
+    // Setup QML engine
+    QQmlApplicationEngine engine;
+    
+    // Expose model to QML
+    engine.rootContext()->setContextProperty("todoModel", &todoModel);
+    
+    // Load QML
+    const QUrl url(QStringLiteral("qrc:/main.qml"));
+    engine.load(url);
+    
+    if (engine.rootObjects().isEmpty())
+        return -1;
+    
+    return app.exec();
+}
 ```
 
----
+### 📄 todo.pro
 
-## 🔧 CMakeLists.txt Example
+```qmake
+QT += quick sql
+CONFIG += c++17
+
+# Input files
+SOURCES += \
+    main.cpp \
+    todomodel.cpp
+
+HEADERS += \
+    todomodel.h
+
+RESOURCES += qml.qrc
+
+# Output
+TARGET = todo-app
+TEMPLATE = app
+
+# Install
+target.path = /usr/local/bin
+INSTALLS += target
+```
+
+### 📄 qml.qrc
+
+```xml
+<RCC>
+    <qresource prefix="/">
+        <file>main.qml</file>
+    </qresource>
+</RCC>
+```
+
+### 📄 CMakeLists.txt
 
 ```cmake
 cmake_minimum_required(VERSION 3.16)
-project(DatabaseApp LANGUAGES CXX)
+project(todo-app LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Sql Widgets)
+# Find Qt
+find_package(Qt6 REQUIRED COMPONENTS Core Quick Sql)
 
-qt_add_executable(DatabaseApp
+# Add executable
+qt_add_executable(todo-app
     main.cpp
+    todomodel.h
+    todomodel.cpp
 )
 
-target_link_libraries(DatabaseApp PRIVATE
-    Qt6::Core
-    Qt6::Sql
-    Qt6::Widgets
+# Add QML module
+qt_add_qml_module(todo-app
+    URI TodoApp
+    VERSION 1.0
+    QML_FILES main.qml
 )
+
+# Link libraries
+target_link_libraries(todo-app PRIVATE
+    Qt6::Core
+    Qt6::Quick
+    Qt6::Sql
+)
+
+# Install
+install(TARGETS todo-app
+    RUNTIME DESTINATION bin
+)
+```
+
+### 📄 Makefile (Manual - Optional)
+
+```makefile
+# Compiler
+CXX = g++
+CXXFLAGS = -std=c++17 -Wall -fPIC
+
+# Qt paths (adjust for your system)
+QT_PATH = /usr/lib/qt6
+QT_INCLUDE = $(QT_PATH)/include
+QT_LIBS = $(QT_PATH)/lib
+
+# Include paths
+INCLUDES = -I$(QT_INCLUDE) \
+           -I$(QT_INCLUDE)/QtCore \
+           -I$(QT_INCLUDE)/QtGui \
+           -I$(QT_INCLUDE)/QtQuick \
+           -I$(QT_INCLUDE)/QtQml \
+           -I$(QT_INCLUDE)/QtSql
+
+# Libraries
+LIBS = -L$(QT_LIBS) \
+       -lQt6Core -lQt6Gui -lQt6Quick -lQt6Qml -lQt6Sql
+
+# Files
+SOURCES = main.cpp todomodel.cpp
+HEADERS = todomodel.h
+OBJECTS = $(SOURCES:.cpp=.o)
+TARGET = todo-app
+
+# Build
+all: $(TARGET)
+
+$(TARGET): $(OBJECTS)
+	$(CXX) $(OBJECTS) -o $(TARGET) $(LIBS)
+
+%.o: %.cpp $(HEADERS)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
+
+clean:
+	rm -f $(OBJECTS) $(TARGET) moc_*.cpp moc_*.o
+
+.PHONY: all clean
+```
+
+### 🔨 Build & Run
+
+#### Using qmake (Recommended):
+```bash
+# Generate Makefile
+qmake todo.pro
+
+# Build
+make
+
+# Run
+./todo-app
+```
+
+#### Using CMake:
+```bash
+# Configure
+cmake -B build
+
+# Build
+cmake --build build
+
+# Run
+./build/todo-app
+```
+
+#### Using Qt Creator:
+1. Open `todo.pro`
+2. Click "Configure Project"
+3. Click Run (Ctrl+R)
+
+---
+
+## Example 2: User Management with Material Design
+
+### 📁 Project Structure
+```
+user-manager/
+├── usermanager.h
+├── usermanager.cpp
+├── main.qml
+├── main.cpp
+├── user-manager.pro
+└── qml.qrc
+```
+
+### 📄 usermanager.h
+
+```cpp
+#ifndef USERMANAGER_H
+#define USERMANAGER_H
+
+#include <QAbstractListModel>
+#include <QSqlDatabase>
+
+struct User {
+    int id;
+    QString name;
+    QString email;
+    int age;
+    QString avatar;
+};
+
+class UserManager : public QAbstractListModel
+{
+    Q_OBJECT
+    Q_PROPERTY(int count READ rowCount NOTIFY countChanged)
+    Q_PROPERTY(QString searchText READ searchText WRITE setSearchText NOTIFY searchTextChanged)
+    
+public:
+    enum UserRoles {
+        IdRole = Qt::UserRole + 1,
+        NameRole,
+        EmailRole,
+        AgeRole,
+        AvatarRole
+    };
+    
+    explicit UserManager(QObject *parent = nullptr);
+    ~UserManager();
+    
+    int rowCount(const QModelIndex &parent = QModelIndex()) const override;
+    QVariant data(const QModelIndex &index, int role) const override;
+    QHash<int, QByteArray> roleNames() const override;
+    
+    QString searchText() const { return m_searchText; }
+    void setSearchText(const QString &text);
+    
+    Q_INVOKABLE bool addUser(const QString &name, const QString &email, int age);
+    Q_INVOKABLE bool updateUser(int index, const QString &name, const QString &email, int age);
+    Q_INVOKABLE bool deleteUser(int index);
+    Q_INVOKABLE QVariantMap getUser(int index) const;
+    Q_INVOKABLE void refresh();
+    Q_INVOKABLE void sortBy(const QString &field, bool ascending);
+    
+signals:
+    void countChanged();
+    void searchTextChanged();
+    void errorOccurred(const QString &message);
+    void userAdded();
+    void userUpdated();
+    void userDeleted();
+    
+private:
+    void loadUsers();
+    bool initDatabase();
+    QString generateAvatar(const QString &name);
+    
+    QList<User> m_users;
+    QSqlDatabase m_db;
+    QString m_searchText;
+    QString m_sortField;
+    bool m_sortAscending;
+};
+
+#endif
+```
+
+### 📄 usermanager.cpp
+
+```cpp
+#include "usermanager.h"
+#include <QSqlQuery>
+#include <QSqlError>
+#include <QDebug>
+
+UserManager::UserManager(QObject *parent)
+    : QAbstractListModel(parent)
+    , m_sortField("name")
+    , m_sortAscending(true)
+{
+    if (initDatabase()) {
+        loadUsers();
+    }
+}
+
+UserManager::~UserManager()
+{
+    if (m_db.isOpen()) {
+        m_db.close();
+    }
+}
+
+bool UserManager::initDatabase()
+{
+    m_db = QSqlDatabase::addDatabase("QSQLITE");
+    m_db.setDatabaseName("users.db");
+    
+    if (!m_db.open()) {
+        emit errorOccurred("Cannot open database");
+        return false;
+    }
+    
+    QSqlQuery query(m_db);
+    bool success = query.exec(
+        "CREATE TABLE IF NOT EXISTS users ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "name TEXT NOT NULL, "
+        "email TEXT UNIQUE, "
+        "age INTEGER, "
+        "created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
+    
+    if (!success) {
+        emit errorOccurred("Cannot create table");
+        return false;
+    }
+    
+    return true;
+}
+
+void UserManager::loadUsers()
+{
+    beginResetModel();
+    m_users.clear();
+    
+    QString sql = "SELECT id, name, email, age FROM users";
+    
+    if (!m_searchText.isEmpty()) {
+        sql += " WHERE name LIKE :search OR email LIKE :search";
+    }
+    
+    sql += QString(" ORDER BY %1 %2")
+           .arg(m_sortField)
+           .arg(m_sortAscending ? "ASC" : "DESC");
+    
+    QSqlQuery query(m_db);
+    query.prepare(sql);
+    
+    if (!m_searchText.isEmpty()) {
+        query.bindValue(":search", "%" + m_searchText + "%");
+    }
+    
+    if (query.exec()) {
+        while (query.next()) {
+            User user;
+            user.id = query.value(0).toInt();
+            user.name = query.value(1).toString();
+            user.email = query.value(2).toString();
+            user.age = query.value(3).toInt();
+            user.avatar = generateAvatar(user.name);
+            m_users.append(user);
+        }
+    }
+    
+    endResetModel();
+    emit countChanged();
+}
+
+QString UserManager::generateAvatar(const QString &name)
+{
+    if (name.isEmpty()) return "👤";
+    
+    QStringList avatars = {"👨", "👩", "👦", "👧", "🧑", "👴", "👵"};
+    int index = qAbs(name[0].unicode()) % avatars.size();
+    return avatars[index];
+}
+
+int UserManager::rowCount(const QModelIndex &parent) const
+{
+    Q_UNUSED(parent);
+    return m_users.count();
+}
+
+QVariant UserManager::data(const QModelIndex &index, int role) const
+{
+    if (!index.isValid() || index.row() >= m_users.count())
+        return QVariant();
+    
+    const User &user = m_users[index.row()];
+    
+    switch (role) {
+    case IdRole: return user.id;
+    case NameRole: return user.name;
+    case EmailRole: return user.email;
+    case AgeRole: return user.age;
+    case AvatarRole: return user.avatar;
+    }
+    
+    return QVariant();
+}
+
+QHash<int, QByteArray> UserManager::roleNames() const
+{
+    QHash<int, QByteArray> roles;
+    roles[IdRole] = "userId";
+    roles[NameRole] = "name";
+    roles[EmailRole] = "email";
+    roles[AgeRole] = "age";
+    roles[AvatarRole] = "avatar";
+    return roles;
+}
+
+void UserManager::setSearchText(const QString &text)
+{
+    if (m_searchText != text) {
+        m_searchText = text;
+        loadUsers();
+        emit searchTextChanged();
+    }
+}
+
+bool UserManager::addUser(const QString &name, const QString &email, int age)
+{
+    QSqlQuery query(m_db);
+    query.prepare("INSERT INTO users (name, email, age) VALUES (?, ?, ?)");
+    query.addBindValue(name);
+    query.addBindValue(email);
+    query.addBindValue(age);
+    
+    if (!query.exec()) {
+        emit errorOccurred("Failed to add user: " + query.lastError().text());
+        return false;
+    }
+    
+    loadUsers();
+    emit userAdded();
+    return true;
+}
+
+bool UserManager::updateUser(int index, const QString &name, const QString &email, int age)
+{
+    if (index < 0 || index >= m_users.count())
+        return false;
+    
+    int userId = m_users[index].id;
+    
+    QSqlQuery query(m_db);
+    query.prepare("UPDATE users SET name = ?, email = ?, age = ? WHERE id = ?");
+    query.addBindValue(name);
+    query.addBindValue(email);
+    query.addBindValue(age);
+    query.addBindValue(userId);
+    
+    if (!query.exec()) {
+        emit errorOccurred("Failed to update user");
+        return false;
+    }
+    
+    loadUsers();
+    emit userUpdated();
+    return true;
+}
+
+bool UserManager::deleteUser(int index)
+{
+    if (index < 0 || index >= m_users.count())
+        return false;
+    
+    int userId = m_users[index].id;
+    
+    QSqlQuery query(m_db);
+    query.prepare("DELETE FROM users WHERE id = ?");
+    query.addBindValue(userId);
+    
+    if (!query.exec()) {
+        emit errorOccurred("Failed to delete user");
+        return false;
+    }
+    
+    loadUsers();
+    emit userDeleted();
+    return true;
+}
+
+QVariantMap UserManager::getUser(int index) const
+{
+    QVariantMap map;
+    
+    if (index >= 0 && index < m_users.count()) {
+        const User &user = m_users[index];
+        map["id"] = user.id;
+        map["name"] = user.name;
+        map["email"] = user.email;
+        map["age"] = user.age;
+    }
+    
+    return map;
+}
+
+void UserManager::refresh()
+{
+    loadUsers();
+}
+
+void UserManager::sortBy(const QString &field, bool ascending)
+{
+    m_sortField = field;
+    m_sortAscending = ascending;
+    loadUsers();
+}
+```
+
+### 📄 main.qml
+
+```qml
+import QtQuick 2.15
+import QtQuick.Controls 2.15
+import QtQuick.Controls.Material 2.15
+import QtQuick.Layouts 1.15
+
+ApplicationWindow {
+    visible: true
+    width: 900
+    height: 700
+    title: "User Manager"
+    
+    Material.theme: Material.Light
+    Material.accent: Material.Blue
+    
+    header: ToolBar {
+        Material.background: Material.Blue
+        
+        RowLayout {
+            anchors.fill: parent
+            anchors.margins: 10
+            
+            Label {
+                text: "User Management"
+                font.pixelSize: 20
+                font.bold: true
+                color: "white"
+            }
+            
+            Item { Layout.fillWidth: true }
+            
+            Label {
+                text: userManager.count + " users"
+                color: "white"
+                font.pixelSize: 14
+            }
+        }
+    }
+    
+    ColumnLayout {
+        anchors.fill: parent
+        anchors.margins: 20
+        spacing: 15
+        
+        // Search and actions
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 10
+            
+            TextField {
+                id: searchField
+                Layout.fillWidth: true
+                placeholderText: "Search users..."
+                Material.accent: Material.Blue
+                
+                onTextChanged: {
+                    userManager.searchText = text
+                }
+            }
+            
+            Button {
+                text: "Add User"
+                highlighted: true
+                onClicked: addDialog.open()
+            }
+            
+            Button {
+                text: "Sort"
+                flat: true
+                onClicked: sortMenu.open()
+                
+                Menu {
+                    id: sortMenu
+                    MenuItem {
+                        text: "Name (A-Z)"
+                        onTriggered: userManager.sortBy("name", true)
+                    }
+                    MenuItem {
+                        text: "Name (Z-A)"
+                        onTriggered: userManager.sortBy("name", false)
+                    }
+                    MenuItem {
+                        text: "Age (Low-High)"
+                        onTriggered: userManager.sortBy("age", true)
+                    }
+                    MenuItem {
+                        text: "Age (High-Low)"
+                        onTriggered: userManager.sortBy("age", false)
+                    }
+                }
+            }
+        }
+        
+        // User list
+        ListView {
+            id: listView
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            spacing: 10
+            clip: true
+            
+            model: userManager
+            
+            delegate: ItemDelegate {
+                width: listView.width
+                height: 100
+                
+                contentItem: RowLayout {
+                    spacing: 15
+                    
+                    // Avatar
+                    Rectangle {
+                        width: 70
+                        height: 70
+                        radius: 35
+                        color: Material.color(Material.Blue, Material.Shade200)
+                        
+                        Label {
+                            anchors.centerIn: parent
+                            text: model.avatar
+                            font.pixelSize: 32
+                        }
+                    }
+                    
+                    // Info
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 5
+                        
+                        Label {
+                            text: model.name
+                            font.pixelSize: 18
+                            font.bold: true
+                        }
+                        
+                        Label {
+                            text: "📧 " + model.email
+                            font.pixelSize: 14
+                            color: Material.color(Material.Grey)
+                        }
+                        
+                        Label {
+                            text: "🎂 " + model.age + " years old"
+                            font.pixelSize: 14
+                            color: Material.color(Material.Grey)
+                        }
+                    }
+                    
+                    // Actions
+                    ColumnLayout {
+                        spacing: 5
+                        
+                        Button {
+                            text: "Edit"
+                            flat: true
+                            Material.foreground: Material.Blue
+                            onClicked: {
+                                editDialog.editIndex = index
+                                var user = userManager.getUser(index)
+                                editDialog.editName = user.name
+                                editDialog.editEmail = user.email
+                                editDialog.editAge = user.age
+                                editDialog.open()
+                            }
+                        }
+                        
+                        Button {
+                            text: "Delete"
+                            flat: true
+                            Material.foreground: Material.Red
+                            onClicked: {
+                                deleteDialog.deleteIndex = index
+                                deleteDialog.deleteName = model.name
+                                deleteDialog.open()
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Empty state
+            Label {
+                anchors.centerIn: parent
+                text: searchField.text.length > 0 
+                      ? "No users found" 
+                      : "No users yet\nClick 'Add User' to create one"
+                font.pixelSize: 16
+                color: Material.color(Material.Grey)
+                horizontalAlignment: Text.AlignHCenter
+                visible: listView.count === 0
+            }
+        }
+    }
+    
+    // Add Dialog
+    Dialog {
+        id: addDialog
+        title: "Add New User"
+        width: 400
+        standardButtons: Dialog.Save | Dialog.Cancel
+        
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 15
+            
+            TextField {
+                id: addNameField
+                Layout.fillWidth: true
+                placeholderText: "Name *"
+            }
+            
+            TextField {
+                id: addEmailField
+                Layout.fillWidth: true
+                placeholderText: "Email *"
+            }
+            
+            SpinBox {
+                id: addAgeField
+                Layout.fillWidth: true
+                from: 1
+                to: 150
+                value: 25
+                editable: true
+            }
+        }
+        
+        onAccepted: {
+            if (addNameField.text && addEmailField.text) {
+                userManager.addUser(
+                    addNameField.text,
+                    addEmailField.text,
+                    addAgeField.value
+                )
+                addNameField.text = ""
+                addEmailField.text = ""
+                addAgeField.value = 25
+            }
+        }
+    }
+    
+    // Edit Dialog
+    Dialog {
+        id: editDialog
+        title: "Edit User"
+        width: 400
+        standardButtons: Dialog.Save | Dialog.Cancel
+        
+        property int editIndex: -1
+        property alias editName: editNameField.text
+        property alias editEmail: editEmailField.text
+        property alias editAge: editAgeField.value
+        
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 15
+            
+            TextField {
+                id: editNameField
+                Layout.fillWidth: true
+                placeholderText: "Name"
+            }
+            
+            TextField {
+                id: editEmailField
+                Layout.fillWidth: true
+                placeholderText: "Email"
+            }
+            
+            SpinBox {
+                id: editAgeField
+                Layout.fillWidth: true
+                from: 1
+                to: 150
+                editable: true
+            }
+        }
+        
+        onAccepted: {
+            userManager.updateUser(
+                editIndex,
+                editNameField.text,
+                editEmailField.text,
+                editAgeField.value
+            )
+        }
+    }
+    
+    // Delete Dialog
+    Dialog {
+        id: deleteDialog
+        title: "Confirm Delete"
+        width: 400
+        standardButtons: Dialog.Yes | Dialog.No
+        
+        property int deleteIndex: -1
+        property string deleteName: ""
+        
+        Label {
+            text: "Delete user: " + deleteDialog.deleteName + "?"
+            wrapMode: Text.WordWrap
+        }
+        
+        onAccepted: {
+            userManager.deleteUser(deleteIndex)
+        }
+    }
+    
+    // Success snackbar
+    Popup {
+        id: successPopup
+        anchors.centerIn: parent
+        width: 300
+        height: 60
+        closePolicy: Popup.CloseOnEscape
+        
+        property alias text: successLabel.text
+        
+        background: Rectangle {
+            color: Material.color(Material.Green)
+            radius: 8
+        }
+        
+        Label {
+            id: successLabel
+            anchors.centerIn: parent
+            color: "white"
+            font.pixelSize: 14
+        }
+        
+        Timer {
+            id: successTimer
+            interval: 2000
+            onTriggered: successPopup.close()
+        }
+        
+        onOpened: successTimer.start()
+    }
+    
+    Connections {
+        target: userManager
+        
+        function onUserAdded() {
+            successPopup.text = "User added successfully!"
+            successPopup.open()
+        }
+        
+        function onUserUpdated() {
+            successPopup.text = "User updated successfully!"
+            successPopup.open()
+        }
+        
+        function onUserDeleted() {
+            successPopup.text = "User deleted successfully!"
+            successPopup.open()
+        }
+        
+        function onErrorOccurred(message) {
+            errorPopup.text = message
+            errorPopup.open()
+        }
+    }
+    
+    // Error popup
+    Popup {
+        id: errorPopup
+        anchors.centerIn: parent
+        width: 300
+        height: 80
+        
+        property alias text: errorLabel.text
+        
+        background: Rectangle {
+            color: Material.color(Material.Red)
+            radius: 8
+        }
+        
+        Label {
+            id: errorLabel
+            anchors.centerIn: parent
+            color: "white"
+            wrapMode: Text.WordWrap
+            horizontalAlignment: Text.AlignHCenter
+        }
+    }
+}
+```
+
+### 📄 main.cpp
+
+```cpp
+#include <QGuiApplication>
+#include <QQmlApplicationEngine>
+#include <QQmlContext>
+#include <QQuickStyle>
+#include "usermanager.h"
+
+int main(int argc, char *argv[])
+{
+    QGuiApplication app(argc, argv);
+    
+    // Set Material style
+    QQuickStyle::setStyle("Material");
+    
+    // Create manager
+    UserManager userManager;
+    
+    // Setup QML
+    QQmlApplicationEngine engine;
+    engine.rootContext()->setContextProperty("userManager", &userManager);
+    
+    const QUrl url(QStringLiteral("qrc:/main.qml"));
+    engine.load(url);
+    
+    if (engine.rootObjects().isEmpty())
+        return -1;
+    
+    return app.exec();
+}
+```
+
+### 📄 user-manager.pro
+
+```qmake
+QT += quick sql quickcontrols2
+CONFIG += c++17
+
+SOURCES += \
+    main.cpp \
+    usermanager.cpp
+
+HEADERS += \
+    usermanager.h
+
+RESOURCES += qml.qrc
+
+TARGET = user-manager
+TEMPLATE = app
+```
+
+### 📄 qml.qrc
+
+```xml
+<RCC>
+    <qresource prefix="/">
+        <file>main.qml</file>
+    </qresource>
+</RCC>
+```
+
+### 🔨 Build & Run
+
+```bash
+qmake user-manager.pro
+make
+./user-manager
 ```
 
 ---
 
-## 📚 Summary
+## 📝 Summary & Quick Commands
 
-Những ví dụ trên cover:
-- ✅ Basic CRUD operations
-- ✅ Transaction management
-- ✅ Batch operations for performance
-- ✅ Model-View integration
-- ✅ Multi-threading
-- ✅ Custom model với formatting
-- ✅ Connection pooling
-- ✅ JSON export/import
+### Structure của mỗi example:
 
-**Best Practices được demonstrate:**
-- Prepared statements (SQL injection prevention)
-- Transaction wrapping
-- RAII pattern (automatic cleanup)
-- Error handling
-- Thread safety
-- Performance optimization
-
-**Compile và run bất kỳ example nào bằng:**
-```bash
-qmake -project
-echo "QT += sql widgets" >> *.pro
-qmake
-make
-./DatabaseApp
+```
+project/
+├── model.h          → Model header (C++)
+├── model.cpp        → Model implementation (C++)
+├── main.qml         → View (QML)
+├── main.cpp         → Entry point
+├── project.pro      → qmake file
+├── CMakeLists.txt   → CMake file (optional)
+└── qml.qrc          → Resource file
 ```
 
-Happy coding! 🚀
+### Build commands:
+
+```bash
+# Using qmake (recommended)
+qmake *.pro && make
+
+# Using CMake
+cmake -B build && cmake --build build
+
+# Using Qt Creator
+# Just open .pro file and click Run
+```
+
+### Common issues:
+
+```bash
+# If Qt not found
+export QT_PATH=/path/to/qt
+export PATH=$QT_PATH/bin:$PATH
+
+# If SQL driver missing
+sudo apt-get install libqt6sql6-sqlite
+
+# Clean build
+make clean
+rm -rf build Makefile *.o moc_*
+```
+
+---
+
+## 🎓 Learning Path
+
+1. **Start with Example 1** - Basic CRUD todo app
+2. **Then Example 2** - User management với Material Design
+3. Practice: Build your own app (e.g., Contact Manager)
+4. Study more examples: 3-8 (Real-time, Navigation, etc.)
+
+**Mỗi example đều có đầy đủ files để compile và chạy ngay!** 🚀
+
+Bạn có muốn tôi tiếp tục với Examples 3-8 không?
