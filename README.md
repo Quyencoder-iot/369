@@ -19,9 +19,10 @@ Nội dung:
 - 💡 Chiến lược đọc code hiệu quả
 - 🛠️ Tools và setup environment
 
-### 2. [Code-Examples.cpp](./Code-Examples.cpp)
-**Ví dụ code thực tế có thể chạy được**
+### 2. [Code-Examples.cpp](./Code-Examples.cpp) + [Examples-Summary.md](./Examples-Summary.md)
+**Ví dụ code thực tế có thể chạy được + Quick reference**
 
+#### Code-Examples.cpp - Full implementation với chi tiết giải thích:
 Bao gồm:
 - Custom QGuiApplication với event logging
 - DataModel class với Q_PROPERTY và signals
@@ -31,6 +32,16 @@ Bao gồm:
 - Event filter implementation
 - Dynamic component loading
 - Complete main() function tích hợp tất cả
+
+#### Examples-Summary.md - Quick reference guide:
+Bao gồm:
+- Tóm tắt từng example (mục đích, key points, khi nào dùng)
+- Code snippets ngắn gọn
+- Visual diagrams (ASCII art)
+- Comparison tables
+- Best practices cheat sheet
+- Cross-references đến tài liệu khác
+- **Perfect cho quick lookup!**
 
 ### 3. [Debugging-Recipes.md](./Debugging-Recipes.md)
 **Công thức debug và troubleshooting**
@@ -241,6 +252,13 @@ Qt-Core-Classes-Deep-Dive/
 │   ├── Example 6: Event Filters
 │   ├── Example 7: Dynamic Loading
 │   └── Example 8: Complete Integration
+│
+├── Examples-Summary.md
+│   ├── Quick reference cho mỗi example
+│   ├── When to use which example
+│   ├── Code snippets
+│   ├── Best practices cheat sheet
+│   └── Cross-references
 │
 ├── Debugging-Recipes.md
 │   ├── Environment Setup
