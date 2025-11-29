@@ -1,0 +1,154 @@
+# Cấu hình Sway cho Nested Mode
+# File này được thiết kế để chạy Sway trong nested mode
+# Copy file này vào ~/.config/sway/config
+
+# Mod key (Super/Windows key)
+set $mod Mod4
+
+# Terminal emulator
+set $term foot
+# Nếu không có foot, bạn có thể sử dụng:
+# set $term gnome-terminal
+# set $term alacritty
+
+# Application launcher
+set $menu wofi --show drun
+# Hoặc sử dụng dmenu:
+# set $menu dmenu_path | dmenu | xargs swaymsg exec --
+
+# Cấu hình output cho nested mode
+# Điều chỉnh resolution và scale theo nhu cầu
+output * {
+    mode 1920x1080
+    scale 1
+    # scale 1.5  # Nếu cần scale lớn hơn
+}
+
+# Font
+font pango:monospace 10
+
+# Cấu hình workspace
+workspace_layout default
+
+# Keybindings cơ bản
+
+# Khởi chạy terminal
+bindsym $mod+Return exec $term
+
+# Khởi chạy application launcher
+bindsym $mod+d exec $menu
+
+# Đóng focused window
+bindsym $mod+Shift+q kill
+
+# Chuyển focus giữa các windows
+bindsym $mod+j focus left
+bindsym $mod+k focus down
+bindsym $mod+l focus up
+bindsym $mod+semicolon focus right
+
+# Di chuyển focused window
+bindsym $mod+Shift+j move left
+bindsym $mod+Shift+k move down
+bindsym $mod+Shift+l move up
+bindsym $mod+Shift+semicolon move right
+
+# Thay đổi kích thước window
+bindsym $mod+h resize shrink width 10 px or 10 ppt
+bindsym $mod+Shift+h resize grow width 10 px or 10 ppt
+bindsym $mod+v resize shrink height 10 px or 10 ppt
+bindsym $mod+Shift+v resize grow height 10 px or 10 ppt
+
+# Chuyển workspace
+bindsym $mod+1 workspace number 1
+bindsym $mod+2 workspace number 2
+bindsym $mod+3 workspace number 3
+bindsym $mod+4 workspace number 4
+bindsym $mod+5 workspace number 5
+bindsym $mod+6 workspace number 6
+bindsym $mod+7 workspace number 7
+bindsym $mod+8 workspace number 8
+bindsym $mod+9 workspace number 9
+bindsym $mod+0 workspace number 10
+
+# Di chuyển window đến workspace
+bindsym $mod+Shift+1 move container to workspace number 1
+bindsym $mod+Shift+2 move container to workspace number 2
+bindsym $mod+Shift+3 move container to workspace number 3
+bindsym $mod+Shift+4 move container to workspace number 4
+bindsym $mod+Shift+5 move container to workspace number 5
+bindsym $mod+Shift+6 move container to workspace number 6
+bindsym $mod+Shift+7 move container to workspace number 7
+bindsym $mod+Shift+8 move container to workspace number 8
+bindsym $mod+Shift+9 move container to workspace number 9
+bindsym $mod+Shift+0 move container to workspace number 10
+
+# Chuyển workspace tiếp theo/trước đó
+bindsym $mod+bracketleft workspace prev
+bindsym $mod+bracketright workspace next
+
+# Di chuyển window đến workspace tiếp theo/trước đó
+bindsym $mod+Shift+bracketleft move container to workspace prev
+bindsym $mod+Shift+bracketright move container to workspace next
+
+# Layout modes
+bindsym $mod+s layout stacking
+bindsym $mod+w layout tabbed
+bindsym $mod+e layout toggle split
+
+# Fullscreen
+bindsym $mod+f fullscreen toggle
+
+# Floating mode
+bindsym $mod+Shift+space floating toggle
+
+# Focus mode
+bindsym $mod+space focus mode_toggle
+
+# Reload configuration
+bindsym $mod+Shift+c reload
+
+# Exit Sway
+bindsym $mod+Shift+e exec swaynag -t warning -m 'Bạn có muốn thoát Sway không?' -b 'Có' 'swaymsg exit'
+
+# Cấu hình window
+for_window [class="^.*"] border pixel 2
+
+# Cấu hình floating windows
+for_window [class="floating"] floating enable
+
+# Cấu hình màu sắc (tùy chọn)
+# Bạn có thể tùy chỉnh màu sắc theo theme của mình
+client.focused #4c7899 #285577 #ffffff #2e9ef4
+client.unfocused #333333 #222222 #888888 #292d2e
+client.focused_inactive #333333 #5f676a #ffffff #484e50
+
+# Cấu hình gaps (tùy chọn, nếu muốn có khoảng cách giữa các windows)
+# gaps inner 10
+# gaps outer 5
+
+# Cấu hình input (cho nested mode)
+input * {
+    xkb_layout us
+    # xkb_layout us,vi  # Nếu cần bàn phím tiếng Việt
+    # xkb_options grp:alt_shift_toggle
+}
+
+# Cấu hình seat (cho nested mode)
+seat * {
+    xcursor_theme default
+}
+
+# Cấu hình bar (tùy chọn)
+# bar {
+#     position top
+#     status_command while date +'%Y-%m-%d %H:%M:%S'; do sleep 1; done
+#     colors {
+#         statusline #ffffff
+#         background #323232
+#         inactive_workspace #323232 #323232 #5c5c5c
+#     }
+# }
+
+# Cấu hình cho nested mode - đảm bảo Sway có thể chạy trong nested environment
+# Không cần cấu hình đặc biệt, Sway sẽ tự động phát hiện nested mode
