@@ -245,7 +245,7 @@ view->show();
 
 - **[01-core-concepts.md](./docs/01-core-concepts.md)** - Khái niệm core chi tiết
 - **[02-api-reference.md](./docs/02-api-reference.md)** - API Reference đầy đủ
-- **[03-examples.md](./docs/03-examples.md)** - Examples thực tế với code
+- **[03-examples.md](./docs/03-examples.md)** - 10 Examples với QML + Model-View ⭐ (Updated!)
 - **[04-advanced-topics.md](./docs/04-advanced-topics.md)** - Multi-monitor, margins, scope
 - **[05-best-practices.md](./docs/05-best-practices.md)** - Best practices & patterns
 - **[06-quick-reference.md](./docs/06-quick-reference.md)** - Cheatsheet nhanh

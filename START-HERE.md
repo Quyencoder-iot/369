@@ -136,10 +136,11 @@ make
    - All classes, methods, properties
    - CMake & QML integration
 
-3. **03-examples.md** (1-2 hours)
-   - 10 complete, working examples
+3. **03-examples.md** (1-2 hours) ⭐ **UPDATED - Now QML!**
+   - 10 complete examples với Model-View architecture
+   - All using QML views + C++ models
    - Panel, dock, widget, wallpaper, etc.
-   - Copy-paste ready code
+   - Modern, clean code
 
 4. **04-advanced-topics.md** (45-60 min)
    - Dynamic configuration
