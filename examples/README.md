@@ -69,6 +69,26 @@ This folder contains practical, working examples demonstrating LayerShellQt usag
 
 ---
 
+### 06-qml-multi-monitor-panel.cpp
+**QML-based multi-monitor panel (Model-View pattern)**
+- Layer: TOP
+- Demonstrates: Model-View architecture, QML UI, data binding
+- Use case: Modern panel with QML UI, clean architecture
+
+**Files:**
+- `06-qml-multi-monitor-panel.cpp` - C++ Model & Manager
+- `Panel.qml` - QML View
+- `MODEL-VIEW-EXPLANATION.md` - Architecture explanation
+
+**Run:**
+```bash
+./06-qml-multi-monitor-panel
+```
+
+**See:** `QML-EXAMPLE-README.md` for detailed info
+
+---
+
 ## Building
 
 ### Using CMake (Recommended)
@@ -98,15 +118,25 @@ g++ 01-simple-panel.cpp -o 01-simple-panel \
     -fPIC
 ```
 
-**All examples:**
+**All examples (Widget-based):**
 ```bash
-for file in *.cpp; do
+for file in 0{1,2,3,4,5}-*.cpp; do
     name="${file%.cpp}"
     echo "Building $name..."
     g++ "$file" -o "$name" \
         $(pkg-config --cflags --libs Qt5Widgets LayerShellQtInterface) \
         -fPIC
 done
+```
+
+**QML example:**
+```bash
+./build-qml-example.sh
+# Or manually:
+rcc resources.qrc -o qrc_resources.cpp
+g++ 06-qml-multi-monitor-panel.cpp qrc_resources.cpp -o 06-qml-multi-monitor-panel \
+    $(pkg-config --cflags --libs Qt5Quick Qt5Qml LayerShellQtInterface) \
+    -fPIC
 ```
 
 ---
