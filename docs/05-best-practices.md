@@ -2,14 +2,13 @@
 
 ## Mục Lục
 1. [Design Principles](#design-principles)
-2. [Model-View Patterns](#model-view-patterns)
-3. [QML Best Practices](#qml-best-practices)
-4. [C++ Model Patterns](#c-model-patterns)
-5. [UI/UX Guidelines](#uiux-guidelines)
-6. [Performance Best Practices](#performance-best-practices)
-7. [Error Handling](#error-handling)
-8. [Testing Strategies](#testing-strategies)
-9. [Common Pitfalls](#common-pitfalls)
+2. [Model Patterns](#model-patterns)
+3. [QML View Patterns](#qml-view-patterns)
+4. [UI/UX Guidelines](#uiux-guidelines)
+5. [Performance Best Practices](#performance-best-practices)
+6. [Error Handling](#error-handling)
+7. [Testing Strategies](#testing-strategies)
+8. [Common Pitfalls](#common-pitfalls)
 
 ---
 
@@ -19,227 +18,320 @@
 
 **Always separate business logic (C++) from UI (QML)!**
 
+✅ **GOOD:**
 ```cpp
-// ✓ GOOD: Model - Business logic only
+// Model: PanelModel.h - Business logic
 class PanelModel : public QObject {
     Q_OBJECT
-    Q_PROPERTY(QString currentTime READ currentTime NOTIFY timeChanged)
+    Q_PROPERTY(QString time READ time NOTIFY timeChanged)
     
 public:
-    QString currentTime() const { return m_currentTime; }
+    QString time() const { return m_time; }
     
 signals:
     void timeChanged();
     
 private:
     void updateTime(); // Logic here
-    QString m_currentTime;
+    QString m_time;
 };
 ```
 
 ```qml
-// ✓ GOOD: View - UI only
+// View: Panel.qml - UI only
 Rectangle {
     Text {
-        text: panelModel.currentTime  // Data binding
-        color: "white"
+        text: panelModel.time  // Data binding
     }
 }
 ```
 
-```cpp
-// ✗ BAD: Mixed logic and UI
-class PanelWidget : public QWidget {
-    void paintEvent(QPaintEvent*) {
-        // Drawing code
-        QString time = getCurrentTime(); // Logic mixed in!
-        painter.drawText(rect(), time);
-    }
-};
-```
-
----
-
-### Principle 2: Configure Before Show
-
-**Set LayerShellQt properties BEFORE showing window!**
-
-```cpp
-// ✓ GOOD
-QQuickView view;
-view.rootContext()->setContextProperty("model", &model);
-view.setSource(QUrl("qrc:/Panel.qml"));
-
-// Configure layer shell BEFORE show
-auto layerWindow = LayerShellQt::Window::get(&view);
-layerWindow->setLayer(LayerShellQt::Window::LayerTop);
-layerWindow->setAnchors(AnchorTop | AnchorLeft | AnchorRight);
-
-view.show();  // Now window appears correctly
-```
-
-```cpp
-// ✗ BAD
-view.show();  // Too early!
-auto layerWindow = LayerShellQt::Window::get(&view);
-layerWindow->setLayer(LayerTop);  // Won't work properly
-```
-
----
-
-### Principle 3: Use Appropriate Layer
-
-**Choose layer theo use case:**
-
+✗ **BAD:**
 ```qml
-// ✓ GOOD: Panel uses TOP layer
-// Model.h
-Q_PROPERTY(int recommendedLayer READ recommendedLayer CONSTANT)
-
-int recommendedLayer() const {
-    return LayerShellQt::Window::LayerTop;
+// DON'T put logic in QML
+Rectangle {
+    property var timer: Timer {
+        onTriggered: {
+            // Complex calculations here - WRONG!
+            var result = complexCalculation();
+        }
+    }
 }
 ```
 
-```cpp
-// ✓ GOOD: Set appropriate layer
-layerWindow->setLayer(model.recommendedLayer());
-```
-
-**Layer Decision Tree:**
-
-```
-Need user interaction?
-├─ Yes → TOP or OVERLAY
-│  ├─ Critical/blocking? → OVERLAY
-│  └─ Normal panel/dock? → TOP
-└─ No → BOTTOM or BACKGROUND
-   ├─ Below windows? → BOTTOM
-   └─ Wallpaper? → BACKGROUND
-```
+**Why:**
+- Models testable independently
+- QML focused on presentation
+- Better performance (C++ faster than QML)
+- Easier to maintain
 
 ---
 
-### Principle 4: Expose Only Necessary Data to QML
+### Principle 2: Use Appropriate Model Type
 
-**Keep Model interface minimal:**
+Choose the right model base class:
 
-```cpp
-// ✓ GOOD: Minimal interface
-class PanelModel : public QObject {
-    Q_OBJECT
-    Q_PROPERTY(QString displayText READ displayText NOTIFY textChanged)
-    
-public:
-    QString displayText() const { return m_displayText; }
-    
-signals:
-    void textChanged();
-    
-private:
-    // Internal complexity hidden
-    void fetchData();
-    void processData();
-    QString m_displayText;
-    QList<InternalData> m_internalList;  // Not exposed to QML
-};
-```
+#### QObject (Simple Properties)
 
 ```cpp
-// ✗ BAD: Exposing everything
-class BadModel : public QObject {
-    Q_OBJECT
-    Q_PROPERTY(QList<InternalData> rawData READ rawData)  // Too much!
-    Q_PROPERTY(DatabaseConnection* db READ db)  // Dangerous!
-    // QML shouldn't access these directly
-};
-```
-
----
-
-## Model-View Patterns
-
-### Pattern 1: Simple Property Model
-
-**For single values:**
-
-```cpp
-// Model (C++)
+// For simple data with properties
 class SimpleModel : public QObject {
     Q_OBJECT
-    Q_PROPERTY(QString value READ value NOTIFY valueChanged)
-    Q_PROPERTY(bool isReady READ isReady NOTIFY readyChanged)
+    Q_PROPERTY(QString text READ text NOTIFY textChanged)
+    Q_PROPERTY(int value READ value NOTIFY valueChanged)
+};
+```
+
+**Use when:**
+- Simple properties (strings, numbers, bools)
+- No list of items
+- Few properties
+
+#### QAbstractListModel (Lists)
+
+```cpp
+// For lists of items
+class ListModel : public QAbstractListModel {
+    Q_OBJECT
+    
+    enum Roles {
+        NameRole = Qt::UserRole + 1,
+        IconRole
+    };
+    
+    int rowCount(const QModelIndex &parent) const override;
+    QVariant data(const QModelIndex &index, int role) const override;
+    QHash<int, QByteArray> roleNames() const override;
+};
+```
+
+**Use when:**
+- List of items (apps, screens, notifications)
+- Used with Repeater, ListView
+- Dynamic add/remove items
+
+---
+
+### Principle 3: Configure LayerShell Before Show
+
+**CRITICAL:** Always configure LayerShellQt **before** `view.show()`!
+
+✅ **GOOD:**
+```cpp
+QQuickView view;
+
+// 1. Setup context
+view.rootContext()->setContextProperty("model", &model);
+
+// 2. Load QML
+view.setSource(QUrl("qrc:/View.qml"));
+
+// 3. Configure LayerShell
+auto layerWindow = LayerShellQt::Window::get(&view);
+layerWindow->setLayer(LayerShellQt::Window::LayerTop);
+layerWindow->setAnchors(/* ... */);
+
+// 4. Show
+view.show();
+```
+
+✗ **BAD:**
+```cpp
+view.show();  // Too early!
+auto layerWindow = LayerShellQt::Window::get(&view);
+layerWindow->setLayer(LayerTop);  // Too late!
+```
+
+---
+
+### Principle 4: Use Appropriate Layer
+
+| Use Case | Layer | Exclusive Zone |
+|----------|-------|----------------|
+| Panel/Taskbar | TOP | > 0 (reserve space) |
+| Dock | TOP | > 0 |
+| Notification | TOP | 0 (overlay) |
+| Widget | BOTTOM | 0 |
+| Wallpaper | BACKGROUND | 0 |
+| Lock screen | OVERLAY | -1 (auto) |
+
+✅ **GOOD:**
+```cpp
+// Panel reserves space
+layerWindow->setLayer(LayerTop);
+layerWindow->setExclusiveZone(35);
+```
+
+✗ **BAD:**
+```cpp
+// Notification shouldn't use OVERLAY
+layerWindow->setLayer(LayerOverlay);  // Too aggressive!
+```
+
+---
+
+## Model Patterns
+
+### Pattern 1: Base Model Class
+
+Create reusable base with common functionality:
+
+```cpp
+// BaseModel.h
+class BaseModel : public QObject {
+    Q_OBJECT
     
 public:
-    QString value() const { return m_value; }
-    bool isReady() const { return m_ready; }
-    
-    Q_INVOKABLE void refresh() {
-        // Update data
-        m_value = fetchNewValue();
-        emit valueChanged();
+    explicit BaseModel(QObject *parent = nullptr) : QObject(parent) {
+        if (!LayerShellQt::Shell::isAvailable()) {
+            qWarning() << "Layer shell not available!";
+        }
     }
+    
+protected:
+    // Helper for creating layer windows
+    void configureLayerWindow(QQuickView *view,
+                             LayerShellQt::Window::Layer layer,
+                             LayerShellQt::Window::Anchors anchors,
+                             int exclusiveZone) {
+        auto layerWindow = LayerShellQt::Window::get(view);
+        layerWindow->setLayer(layer);
+        layerWindow->setAnchors(anchors);
+        layerWindow->setExclusiveZone(exclusiveZone);
+    }
+};
+```
+
+**Usage:**
+```cpp
+class PanelModel : public BaseModel {
+    Q_OBJECT
+    // Your specific logic
+};
+```
+
+---
+
+### Pattern 2: Property Model with Auto-Update
+
+```cpp
+// AutoUpdateModel.h
+class AutoUpdateModel : public QObject {
+    Q_OBJECT
+    Q_PROPERTY(QString value READ value NOTIFY valueChanged)
+    
+public:
+    AutoUpdateModel(int intervalMs = 1000, QObject *parent = nullptr)
+        : QObject(parent) {
+        
+        QTimer *timer = new QTimer(this);
+        connect(timer, &QTimer::timeout, this, &AutoUpdateModel::update);
+        timer->start(intervalMs);
+        update();
+    }
+    
+    QString value() const { return m_value; }
     
 signals:
     void valueChanged();
-    void readyChanged();
+    
+protected:
+    virtual void update() = 0;  // Override in subclass
+    
+    void setValue(const QString &value) {
+        if (m_value != value) {
+            m_value = value;
+            emit valueChanged();
+        }
+    }
     
 private:
     QString m_value;
-    bool m_ready = false;
 };
 ```
 
-```qml
-// View (QML)
-Rectangle {
-    Text {
-        text: model.value
-        visible: model.isReady
-    }
+**Usage:**
+```cpp
+class ClockModel : public AutoUpdateModel {
+    Q_OBJECT
     
-    Button {
-        text: "Refresh"
-        onClicked: model.refresh()
+protected:
+    void update() override {
+        setValue(QTime::currentTime().toString("hh:mm:ss"));
     }
-}
+};
 ```
 
 ---
 
-### Pattern 2: List Model
-
-**For collections:**
+### Pattern 3: List Model Template
 
 ```cpp
-// Model (C++)
-class AppListModel : public QAbstractListModel {
+// ListModelTemplate.h
+template<typename T>
+class ListModelTemplate : public QAbstractListModel {
+public:
+    void append(const T &item) {
+        beginInsertRows(QModelIndex(), m_items.count(), m_items.count());
+        m_items.append(item);
+        endInsertRows();
+        emit countChanged();
+    }
+    
+    void remove(int index) {
+        if (index >= 0 && index < m_items.count()) {
+            beginRemoveRows(QModelIndex(), index, index);
+            m_items.removeAt(index);
+            endRemoveRows();
+            emit countChanged();
+        }
+    }
+    
+    void clear() {
+        beginResetModel();
+        m_items.clear();
+        endResetModel();
+        emit countChanged();
+    }
+    
+    int rowCount(const QModelIndex &parent = QModelIndex()) const override {
+        Q_UNUSED(parent);
+        return m_items.count();
+    }
+    
+    int count() const { return m_items.count(); }
+    
+signals:
+    void countChanged();
+    
+protected:
+    QList<T> m_items;
+};
+```
+
+**Usage:**
+```cpp
+struct App {
+    QString name;
+    QString icon;
+    QString command;
+};
+
+class AppListModel : public ListModelTemplate<App> {
     Q_OBJECT
     Q_PROPERTY(int count READ count NOTIFY countChanged)
     
-public:
     enum Roles {
         NameRole = Qt::UserRole + 1,
         IconRole,
         CommandRole
     };
     
-    struct App {
-        QString name;
-        QString icon;
-        QString command;
-    };
-    
-    int rowCount(const QModelIndex &parent = QModelIndex()) const override {
-        Q_UNUSED(parent);
-        return m_apps.count();
-    }
-    
     QVariant data(const QModelIndex &index, int role) const override {
-        if (!index.isValid() || index.row() >= m_apps.count())
+        if (!index.isValid() || index.row() >= m_items.count())
             return QVariant();
         
-        const App &app = m_apps.at(index.row());
+        const App &app = m_items.at(index.row());
         switch (role) {
         case NameRole: return app.name;
         case IconRole: return app.icon;
@@ -255,637 +347,313 @@ public:
             {CommandRole, "command"}
         };
     }
-    
-    int count() const { return m_apps.count(); }
-    
-    Q_INVOKABLE void addApp(const QString &name, const QString &icon, 
-                           const QString &command) {
-        beginInsertRows(QModelIndex(), m_apps.count(), m_apps.count());
-        m_apps.append({name, icon, command});
-        endInsertRows();
-        emit countChanged();
-    }
-    
-signals:
-    void countChanged();
-    
-private:
-    QList<App> m_apps;
 };
 ```
 
-```qml
-// View (QML)
-ListView {
-    model: appListModel
+---
+
+### Pattern 4: Singleton Model
+
+```cpp
+// SingletonModel.h
+class SingletonModel : public QObject {
+    Q_OBJECT
     
-    delegate: Rectangle {
-        width: parent.width
-        height: 50
-        
-        Row {
-            spacing: 10
-            
-            Text {
-                text: model.icon
-                font.pixelSize: 24
-            }
-            
-            Text {
-                text: model.name
-                color: "white"
-            }
-        }
-        
-        MouseArea {
-            anchors.fill: parent
-            onClicked: {
-                // Launch app via model
-                Qt.openUrlExternally(model.command)
-            }
-        }
+public:
+    static SingletonModel* instance() {
+        static SingletonModel instance;
+        return &instance;
     }
+    
+    // Prevent copying
+    SingletonModel(const SingletonModel&) = delete;
+    SingletonModel& operator=(const SingletonModel&) = delete;
+    
+private:
+    SingletonModel() = default;
+};
+```
+
+**Register as QML singleton:**
+```cpp
+// main.cpp
+qmlRegisterSingletonType<SingletonModel>(
+    "MyApp", 1, 0, "GlobalModel",
+    [](QQmlEngine *engine, QJSEngine *scriptEngine) -> QObject* {
+        Q_UNUSED(engine)
+        Q_UNUSED(scriptEngine)
+        return SingletonModel::instance();
+    }
+);
+```
+
+**Use in QML:**
+```qml
+import MyApp 1.0
+
+Rectangle {
+    Text { text: GlobalModel.value }
 }
 ```
 
 ---
 
-### Pattern 3: Manager Pattern
-
-**For managing multiple views:**
+### Pattern 5: View Manager for Multi-Window
 
 ```cpp
-// ViewManager (C++)
-class PanelViewManager : public QObject {
+// ViewManager.h
+class ViewManager : public QObject {
     Q_OBJECT
     
 public:
-    explicit PanelViewManager(QAbstractListModel *model, QObject *parent = nullptr)
-        : QObject(parent), m_model(model) {
+    explicit ViewManager(QObject *parent = nullptr) : QObject(parent) {}
+    
+    QQuickView* createView(const QString &qmlFile, 
+                          QObject *model,
+                          const QString &modelName) {
+        QQuickView *view = new QQuickView();
+        view->rootContext()->setContextProperty(modelName, model);
+        view->setSource(QUrl(qmlFile));
+        view->setResizeMode(QQuickView::SizeRootObjectToView);
         
-        // Watch model changes
-        connect(model, &QAbstractListModel::rowsInserted,
-                this, &PanelViewManager::onRowsInserted);
-        connect(model, &QAbstractListModel::rowsRemoved,
-                this, &PanelViewManager::onRowsRemoved);
-        
-        // Create initial views
-        createViews();
+        m_views.append(view);
+        return view;
     }
     
-private slots:
-    void onRowsInserted(const QModelIndex &parent, int first, int last) {
-        for (int i = first; i <= last; ++i) {
-            createViewForRow(i);
-        }
+    void destroyView(QQuickView *view) {
+        m_views.removeOne(view);
+        view->deleteLater();
     }
     
-    void onRowsRemoved(const QModelIndex &parent, int first, int last) {
-        for (int i = first; i <= last; ++i) {
-            removeViewForRow(i);
-        }
+    void destroyAll() {
+        qDeleteAll(m_views);
+        m_views.clear();
     }
     
 private:
-    void createViewForRow(int row) {
-        // Get data from model
-        QString screenName = m_model->data(
-            m_model->index(row, 0), 
-            ScreenModel::NameRole
-        ).toString();
-        
-        // Create view
-        QQuickView *view = new QQuickView();
-        view->rootContext()->setContextProperty("model", m_model);
-        view->rootContext()->setContextProperty("screenName", screenName);
-        view->setSource(QUrl("qrc:/Panel.qml"));
-        
-        // Configure layer shell
-        auto layerWindow = LayerShellQt::Window::get(view);
-        layerWindow->setScope(screenName);
-        layerWindow->setLayer(LayerShellQt::Window::LayerTop);
-        
-        view->show();
-        m_views.insert(screenName, view);
-    }
-    
-    void removeViewForRow(int row) { /* ... */ }
-    
-    QAbstractListModel *m_model;
-    QHash<QString, QQuickView*> m_views;
+    QList<QQuickView*> m_views;
 };
 ```
 
 **Usage:**
 ```cpp
-ScreenListModel model;
-PanelViewManager manager(&model);
-// Manager automatically creates/destroys views based on model
+ViewManager manager;
+
+// Create multiple views
+auto view1 = manager.createView("qrc:/Panel.qml", &panelModel, "panelModel");
+auto view2 = manager.createView("qrc:/Dock.qml", &dockModel, "dockModel");
+
+// Configure LayerShell for each
+configureLayerShell(view1, LayerTop);
+configureLayerShell(view2, LayerTop);
+
+view1->show();
+view2->show();
 ```
 
 ---
 
-### Pattern 4: Command Pattern (Actions)
+## QML View Patterns
 
-**For user actions:**
+### Pattern 1: Component-Based Architecture
 
-```cpp
-// Model with actions
-class ActionModel : public QObject {
-    Q_OBJECT
+Break UI into reusable components:
+
+**Components/IconButton.qml:**
+```qml
+import QtQuick 2.15
+import QtQuick.Controls 2.15
+
+Button {
+    id: root
     
-public:
-    Q_INVOKABLE void executeAction(const QString &actionName) {
-        if (actionName == "volume") {
-            openVolumeControl();
-        } else if (actionName == "screenshot") {
-            takeScreenshot();
-        } else if (actionName == "lock") {
-            lockScreen();
+    property string iconText: "⚙️"
+    property color iconColor: "white"
+    
+    contentItem: Text {
+        text: root.iconText
+        color: root.iconColor
+        font.pixelSize: 20
+        horizontalAlignment: Text.AlignHCenter
+        verticalAlignment: Text.AlignVCenter
+    }
+    
+    background: Rectangle {
+        color: root.hovered ? "#4d4d4d" : "#3d3d3d"
+        radius: 5
+        
+        Behavior on color {
+            ColorAnimation { duration: 150 }
         }
     }
-    
-    Q_INVOKABLE bool canExecute(const QString &actionName) const {
-        // Check if action is available
-        return checkActionAvailability(actionName);
-    }
-    
-signals:
-    void actionExecuted(const QString &actionName);
-    void actionFailed(const QString &actionName, const QString &error);
-    
-private:
-    void openVolumeControl();
-    void takeScreenshot();
-    void lockScreen();
-};
+}
 ```
 
+**Main view:**
 ```qml
-// View
-Column {
-    Repeater {
-        model: [
-            {name: "volume", icon: "🔊", text: "Volume"},
-            {name: "screenshot", icon: "📸", text: "Screenshot"},
-            {name: "lock", icon: "🔒", text: "Lock Screen"}
-        ]
-        
-        delegate: Button {
-            text: modelData.icon + " " + modelData.text
-            enabled: actionModel.canExecute(modelData.name)
-            
-            onClicked: {
-                actionModel.executeAction(modelData.name)
-            }
-        }
+import QtQuick 2.15
+import "./Components"
+
+Rectangle {
+    IconButton {
+        iconText: "🔊"
+        onClicked: model.volumeAction()
     }
     
-    Connections {
-        target: actionModel
-        
-        function onActionFailed(actionName, error) {
-            errorText.text = "Failed: " + error
-        }
+    IconButton {
+        iconText: "📸"
+        onClicked: model.screenshotAction()
     }
 }
 ```
 
 ---
 
-## QML Best Practices
+### Pattern 2: Data Binding Best Practices
 
-### Practice 1: Use Property Bindings
-
+✅ **GOOD - Direct binding:**
 ```qml
-// ✓ GOOD: Property binding (automatic updates)
 Rectangle {
-    width: parent.width
-    height: model.panelHeight
     color: model.isActive ? "#4fc3f7" : "#2d2d2d"
     
     Text {
-        text: model.currentTime  // Auto-updates
-        visible: model.showClock  // Auto-updates
+        text: model.title
+        visible: model.showTitle
     }
 }
 ```
 
+✗ **BAD - Manual updates:**
 ```qml
-// ✗ BAD: Manual updates
 Rectangle {
-    id: rect
+    id: root
     
     Connections {
         target: model
-        onPanelHeightChanged: {
-            rect.height = model.panelHeight  // Manual!
-        }
         onIsActiveChanged: {
-            rect.color = model.isActive ? "#4fc3f7" : "#2d2d2d"  // Manual!
+            // DON'T do this!
+            root.color = model.isActive ? "#4fc3f7" : "#2d2d2d"
         }
     }
 }
 ```
+
+**Why:** Direct binding is cleaner, automatic, and optimized.
 
 ---
 
-### Practice 2: Component Composition
+### Pattern 3: State Management
+
+Use QML States for UI states:
 
 ```qml
-// ✓ GOOD: Reusable components
-// StatusIcon.qml
-import QtQuick 2.15
-
-Item {
-    property string icon: ""
-    property string text: ""
-    property string status: ""
-    
-    width: 60
-    height: 40
-    
-    Column {
-        anchors.centerIn: parent
-        spacing: 2
-        
-        Text {
-            text: icon
-            font.pixelSize: 20
-            anchors.horizontalCenter: parent.horizontalCenter
-        }
-        
-        Text {
-            text: status
-            font.pixelSize: 10
-            color: "white"
-            anchors.horizontalCenter: parent.horizontalCenter
-        }
-    }
-}
-```
-
-```qml
-// Usage
-Row {
-    StatusIcon {
-        icon: "🔊"
-        status: model.volumeLevel + "%"
-    }
-    
-    StatusIcon {
-        icon: "🔋"
-        status: model.batteryLevel + "%"
-    }
-    
-    StatusIcon {
-        icon: "📶"
-        status: model.networkStatus
-    }
-}
-```
-
----
-
-### Practice 3: Avoid JavaScript Logic in QML
-
-```qml
-// ✗ BAD: Complex logic in QML
-Rectangle {
-    property var items: model.items
-    
-    Text {
-        text: {
-            var result = "";
-            for (var i = 0; i < items.length; i++) {
-                if (items[i].active) {
-                    result += items[i].name;
-                    if (i < items.length - 1) result += ", ";
-                }
-            }
-            return result;
-        }
-    }
-}
-```
-
-```cpp
-// ✓ GOOD: Logic in C++ model
-class Model : public QObject {
-    Q_PROPERTY(QString activeItemsText READ activeItemsText NOTIFY itemsChanged)
-    
-    QString activeItemsText() const {
-        QStringList active;
-        for (const Item &item : m_items) {
-            if (item.active) active << item.name;
-        }
-        return active.join(", ");
-    }
-};
-```
-
-```qml
-// ✓ GOOD: Simple binding in QML
-Text {
-    text: model.activeItemsText
-}
-```
-
----
-
-### Practice 4: Use Loaders for Dynamic Content
-
-```qml
-// ✓ GOOD: Lazy loading
-Loader {
-    id: settingsLoader
-    active: false
-    sourceComponent: SettingsPanel {}
-}
-
-Button {
-    text: "Settings"
-    onClicked: settingsLoader.active = true
-}
-```
-
-```qml
-// ✗ BAD: Always loaded
-SettingsPanel {
-    visible: false  // Still loaded, just hidden!
-}
-
-Button {
-    text: "Settings"
-    onClicked: settingsPanel.visible = true
-}
-```
-
----
-
-### Practice 5: State Management
-
-```qml
-// ✓ GOOD: QML States
 Rectangle {
     id: panel
+    
+    state: panelModel.expanded ? "expanded" : "collapsed"
     
     states: [
         State {
             name: "collapsed"
             PropertyChanges { target: panel; height: 35 }
+            PropertyChanges { target: expandedContent; visible: false }
         },
         State {
             name: "expanded"
             PropertyChanges { target: panel; height: 200 }
+            PropertyChanges { target: expandedContent; visible: true }
         }
     ]
     
-    transitions: Transition {
-        NumberAnimation { 
-            properties: "height"
-            duration: 300 
-            easing.type: Easing.OutCubic
-        }
-    }
-    
-    // Control from model
-    state: model.isExpanded ? "expanded" : "collapsed"
-}
-```
-
----
-
-## C++ Model Patterns
-
-### Pattern 1: Read-Only Properties
-
-```cpp
-// ✓ GOOD: Read-only properties with NOTIFY
-class Model : public QObject {
-    Q_OBJECT
-    Q_PROPERTY(QString text READ text NOTIFY textChanged)
-    
-public:
-    QString text() const { return m_text; }
-    
-signals:
-    void textChanged();
-    
-private:
-    void updateText(const QString &newText) {
-        if (m_text != newText) {
-            m_text = newText;
-            emit textChanged();  // QML auto-updates
-        }
-    }
-    
-    QString m_text;
-};
-```
-
-```cpp
-// ✗ BAD: Writable properties from QML
-class BadModel : public QObject {
-    Q_OBJECT
-    Q_PROPERTY(QString text READ text WRITE setText)
-    
-    // QML can modify internal state directly - dangerous!
-    void setText(const QString &text) { m_text = text; }
-};
-```
-
----
-
-### Pattern 2: Use Q_INVOKABLE for Actions
-
-```cpp
-// ✓ GOOD: Actions via Q_INVOKABLE
-class Model : public QObject {
-    Q_OBJECT
-    
-public:
-    Q_INVOKABLE void performAction() {
-        // Validate, execute, emit signals
-        if (!canPerformAction()) {
-            emit actionFailed("Cannot perform action");
-            return;
-        }
-        
-        doAction();
-        emit actionCompleted();
-    }
-    
-signals:
-    void actionCompleted();
-    void actionFailed(const QString &error);
-    
-private:
-    bool canPerformAction() const;
-    void doAction();
-};
-```
-
----
-
-### Pattern 3: Async Operations
-
-```cpp
-// ✓ GOOD: Async with signals
-class DataModel : public QObject {
-    Q_OBJECT
-    Q_PROPERTY(bool loading READ loading NOTIFY loadingChanged)
-    Q_PROPERTY(QString data READ data NOTIFY dataChanged)
-    Q_PROPERTY(QString error READ error NOTIFY errorChanged)
-    
-public:
-    Q_INVOKABLE void fetchData() {
-        setLoading(true);
-        
-        // Async operation
-        QFuture<QString> future = QtConcurrent::run([this]() {
-            return downloadData();
-        });
-        
-        auto watcher = new QFutureWatcher<QString>(this);
-        connect(watcher, &QFutureWatcher<QString>::finished, [this, watcher]() {
-            try {
-                m_data = watcher->result();
-                emit dataChanged();
-            } catch (const std::exception &e) {
-                m_error = e.what();
-                emit errorChanged();
+    transitions: [
+        Transition {
+            NumberAnimation { 
+                properties: "height" 
+                duration: 300 
+                easing.type: Easing.OutCubic
             }
-            setLoading(false);
-            watcher->deleteLater();
-        });
-        watcher->setFuture(future);
-    }
-    
-    bool loading() const { return m_loading; }
-    QString data() const { return m_data; }
-    QString error() const { return m_error; }
-    
-signals:
-    void loadingChanged();
-    void dataChanged();
-    void errorChanged();
-    
-private:
-    QString downloadData();
-    
-    void setLoading(bool loading) {
-        if (m_loading != loading) {
-            m_loading = loading;
-            emit loadingChanged();
         }
-    }
+    ]
     
-    bool m_loading = false;
-    QString m_data;
-    QString m_error;
-};
-```
-
-```qml
-// View with loading state
-Column {
-    BusyIndicator {
-        running: model.loading
-        visible: model.loading
-    }
-    
-    Text {
-        text: model.data
-        visible: !model.loading && !model.error
-    }
-    
-    Text {
-        text: "Error: " + model.error
-        color: "red"
-        visible: model.error
-    }
-    
-    Button {
-        text: "Refresh"
-        enabled: !model.loading
-        onClicked: model.fetchData()
+    Rectangle {
+        id: expandedContent
+        // ...
     }
 }
 ```
 
 ---
 
-### Pattern 4: Model Validation
+### Pattern 4: Loader for Dynamic Content
 
-```cpp
-// ✓ GOOD: Validate in model
-class FormModel : public QObject {
-    Q_OBJECT
-    Q_PROPERTY(QString password READ password WRITE setPassword NOTIFY passwordChanged)
-    Q_PROPERTY(QString passwordError READ passwordError NOTIFY passwordErrorChanged)
-    Q_PROPERTY(bool isValid READ isValid NOTIFY isValidChanged)
-    
-public:
-    QString password() const { return m_password; }
-    QString passwordError() const { return m_passwordError; }
-    bool isValid() const { return m_isValid; }
-    
-    void setPassword(const QString &password) {
-        m_password = password;
-        validatePassword();
-        emit passwordChanged();
-    }
-    
-signals:
-    void passwordChanged();
-    void passwordErrorChanged();
-    void isValidChanged();
-    
-private:
-    void validatePassword() {
-        QString oldError = m_passwordError;
-        bool oldValid = m_isValid;
-        
-        if (m_password.length() < 8) {
-            m_passwordError = "Password too short";
-            m_isValid = false;
-        } else if (!containsNumber(m_password)) {
-            m_passwordError = "Password must contain a number";
-            m_isValid = false;
-        } else {
-            m_passwordError.clear();
-            m_isValid = true;
-        }
-        
-        if (oldError != m_passwordError) emit passwordErrorChanged();
-        if (oldValid != m_isValid) emit isValidChanged();
-    }
-    
-    QString m_password;
-    QString m_passwordError;
-    bool m_isValid = false;
-};
-```
+Use Loader for lazy loading:
 
 ```qml
-// View
-Column {
-    TextField {
-        text: model.password
-        onTextChanged: model.password = text
-        echoMode: TextInput.Password
-    }
-    
-    Text {
-        text: model.passwordError
-        color: "red"
-        visible: model.passwordError
+Rectangle {
+    Loader {
+        id: settingsLoader
+        active: false  // Don't load until needed
+        source: "qrc:/Settings.qml"
     }
     
     Button {
-        text: "Submit"
-        enabled: model.isValid
+        text: "Settings"
+        onClicked: {
+            settingsLoader.active = true
+        }
+    }
+}
+```
+
+---
+
+### Pattern 5: Reusable Delegates
+
+```qml
+// AppDelegate.qml
+import QtQuick 2.15
+import QtQuick.Controls 2.15
+
+Button {
+    required property string name
+    required property string icon
+    required property string command
+    
+    contentItem: Column {
+        spacing: 5
+        
+        Text {
+            text: icon
+            font.pixelSize: 24
+            anchors.horizontalCenter: parent.horizontalCenter
+        }
+        
+        Text {
+            text: name
+            color: "white"
+            font.pixelSize: 10
+            anchors.horizontalCenter: parent.horizontalCenter
+        }
+    }
+    
+    background: Rectangle {
+        color: parent.hovered ? "#4d4d4d" : "#3d3d3d"
+        radius: 5
+    }
+    
+    onClicked: model.launchApp(command)
+}
+```
+
+**Usage:**
+```qml
+Repeater {
+    model: appListModel
+    
+    delegate: AppDelegate {
+        name: model.name
+        icon: model.icon
+        command: model.command
     }
 }
 ```
@@ -894,120 +662,139 @@ Column {
 
 ## UI/UX Guidelines
 
-### Guideline 1: Visual Hierarchy
+### Guideline 1: Consistent Sizing
 
-**Use QML properties for styling:**
+Define constants for consistency:
 
 ```qml
-// ✓ GOOD: Clear visual hierarchy
+// Theme.qml - Singleton
+pragma Singleton
+import QtQuick 2.15
+
+QtObject {
+    // Panel sizes
+    readonly property int panelHeightSmall: 28
+    readonly property int panelHeightMedium: 35
+    readonly property int panelHeightLarge: 48
+    
+    // Colors
+    readonly property color backgroundDark: "#1e1e1e"
+    readonly property color backgroundMid: "#2d2d2d"
+    readonly property color backgroundLight: "#3d3d3d"
+    readonly property color accentColor: "#4fc3f7"
+    
+    // Spacing
+    readonly property int spacingSmall: 5
+    readonly property int spacingMedium: 10
+    readonly property int spacingLarge: 15
+    
+    // Animations
+    readonly property int animationFast: 150
+    readonly property int animationMedium: 300
+    readonly property int animationSlow: 500
+}
+```
+
+**Usage:**
+```qml
+import "."
+
+Rectangle {
+    height: Theme.panelHeightMedium
+    color: Theme.backgroundMid
+    
+    RowLayout {
+        spacing: Theme.spacingMedium
+    }
+}
+```
+
+---
+
+### Guideline 2: Responsive Design
+
+Adapt to screen size:
+
+```qml
 Rectangle {
     id: panel
     
-    // Theme properties
-    readonly property color primaryColor: "#4fc3f7"
-    readonly property color backgroundColor: "#2d2d2d"
-    readonly property color textColor: "white"
-    readonly property int titleSize: 16
-    readonly property int normalSize: 12
-    
-    color: backgroundColor
-    
-    Text {
-        text: "Title"
-        color: primaryColor
-        font.pixelSize: titleSize
-        font.bold: true
+    // Responsive height
+    height: {
+        if (Screen.height <= 768) return 28
+        if (Screen.height <= 1080) return 35
+        return 48
     }
     
     Text {
-        text: "Content"
-        color: textColor
-        font.pixelSize: normalSize
+        // Responsive font
+        font.pixelSize: panel.height * 0.4
     }
 }
 ```
 
 ---
 
-### Guideline 2: Responsive Sizing
+### Guideline 3: Accessibility
 
 ```qml
-// ✓ GOOD: Responsive to screen size
-Rectangle {
-    // Adapt to screen dimensions
-    property real scaleFactor: Math.min(
-        Screen.width / 1920,
-        Screen.height / 1080
-    )
+Button {
+    text: "Volume"
     
-    height: 35 * scaleFactor
+    // Accessible properties
+    Accessible.name: "Volume Control"
+    Accessible.description: "Adjust system volume"
+    Accessible.role: Accessible.Button
     
-    Text {
-        font.pixelSize: 14 * scaleFactor
-    }
+    // Keyboard support
+    Keys.onReturnPressed: clicked()
+    Keys.onEnterPressed: clicked()
 }
 ```
 
 ---
 
-### Guideline 3: Consistent Spacing
+### Guideline 4: Visual Feedback
+
+Always provide feedback:
 
 ```qml
-// ✓ GOOD: Use spacing properties
-Item {
-    readonly property int spacingSmall: 5
-    readonly property int spacingMedium: 10
-    readonly property int spacingLarge: 20
+Button {
+    id: btn
     
-    ColumnLayout {
-        spacing: spacingMedium
+    background: Rectangle {
+        color: {
+            if (btn.pressed) return "#5d5d5d"
+            if (btn.hovered) return "#4d4d4d"
+            return "#3d3d3d"
+        }
         
+        Behavior on color {
+            ColorAnimation { duration: 150 }
+        }
+        
+        // Ripple effect on click
         Rectangle {
-            Layout.margins: spacingSmall
-        }
-        
-        Rectangle {
-            Layout.topMargin: spacingLarge
-        }
-    }
-}
-```
-
----
-
-### Guideline 4: Animations
-
-```qml
-// ✓ GOOD: Smooth animations
-Rectangle {
-    id: button
-    color: "#3d3d3d"
-    
-    Behavior on color {
-        ColorAnimation { duration: 150 }
-    }
-    
-    scale: 1.0
-    
-    Behavior on scale {
-        NumberAnimation { 
-            duration: 100
-            easing.type: Easing.OutCubic
-        }
-    }
-    
-    MouseArea {
-        anchors.fill: parent
-        hoverEnabled: true
-        
-        onEntered: {
-            button.color = "#4d4d4d"
-            button.scale = 1.05
-        }
-        
-        onExited: {
-            button.color = "#3d3d3d"
-            button.scale = 1.0
+            id: ripple
+            anchors.centerIn: parent
+            width: 0
+            height: width
+            radius: width / 2
+            color: Qt.rgba(1, 1, 1, 0.3)
+            
+            states: State {
+                name: "active"
+                when: btn.pressed
+                PropertyChanges { target: ripple; width: parent.width * 2 }
+            }
+            
+            transitions: Transition {
+                NumberAnimation { 
+                    property: "width" 
+                    duration: 300 
+                    easing.type: Easing.OutCubic
+                }
+            }
         }
     }
 }
@@ -1019,31 +806,46 @@ Rectangle {
 
 ### Practice 1: Minimize Property Bindings
 
+✅ **GOOD:**
 ```qml
-// ✗ BAD: Complex binding recalculated often
 Text {
-    text: model.firstName + " " + model.lastName + 
-          " (" + model.age + " years old)"
+    text: model.value  // Simple binding - OK
 }
 ```
 
+✗ **BAD:**
+```qml
+Text {
+    // Complex binding recalculates too often
+    text: {
+        var result = "";
+        for (var i = 0; i < model.count; i++) {
+            result += model.getData(i) + " ";
+        }
+        return result;
+    }
+}
+```
+
+**Fix:** Do complex calculations in C++ model:
 ```cpp
-// ✓ GOOD: Pre-computed in model
 class Model : public QObject {
-    Q_PROPERTY(QString displayName READ displayName NOTIFY dataChanged)
+    Q_PROPERTY(QString formattedData READ formattedData NOTIFY dataChanged)
     
-    QString displayName() const {
-        return QString("%1 %2 (%3 years old)")
-            .arg(m_firstName, m_lastName)
-            .arg(m_age);
+    QString formattedData() const {
+        QString result;
+        // Calculate once in C++
+        for (const auto &item : m_data) {
+            result += item + " ";
+        }
+        return result;
     }
 };
 ```
 
 ```qml
-// ✓ GOOD: Simple binding
 Text {
-    text: model.displayName
+    text: model.formattedData  // Simple binding
 }
 ```
 
@@ -1052,45 +854,78 @@ Text {
 ### Practice 2: Use Loaders for Heavy Content
 
 ```qml
-// ✓ GOOD: Load on demand
-Loader {
-    id: heavyContentLoader
-    active: false
-    asynchronous: true
-    
-    sourceComponent: Component {
-        HeavyContent {
-            // Complex UI here
-        }
+Rectangle {
+    Loader {
+        id: heavyLoader
+        active: false
+        asynchronous: true  // Load in background
+        source: "qrc:/HeavyComponent.qml"
+        
+        onLoaded: console.log("Heavy component loaded")
     }
-}
-
-Button {
-    onClicked: heavyContentLoader.active = true
+    
+    Button {
+        text: "Show Heavy Content"
+        onClicked: heavyLoader.active = true
+    }
 }
 ```
 
 ---
 
-### Practice 3: Optimize List Views
+### Practice 3: Optimize Repeater/ListView
 
+✅ **GOOD - Use delegate caching:**
 ```qml
-// ✓ GOOD: Optimized ListView
 ListView {
-    model: appListModel
+    model: largeModel
     
-    // Performance optimizations
-    cacheBuffer: 100  // Cache off-screen items
-    reuseItems: true  // Reuse delegate instances
+    // Cache delegates for reuse
+    cacheBuffer: 200
     
     delegate: Rectangle {
-        // Keep delegate simple!
-        width: parent.width
-        height: 50
+        // Keep delegate simple
+        height: 40
         
         Text {
             text: model.name
-            anchors.centerIn: parent
+        }
+    }
+}
+```
+
+✗ **BAD - Heavy delegates:**
+```qml
+Repeater {
+    model: largeModel
+    
+    delegate: Rectangle {
+        // Complex delegate - creates lag
+        Image { source: model.icon }  // Loads image each time
+        ShaderEffect { /* ... */ }     // Expensive
+        ParticleSystem { /* ... */ }   // Very expensive
+    }
+}
+```
+
+---
+
+### Practice 4: Debounce Expensive Operations
+
+```qml
+Rectangle {
+    property string searchText: ""
+    
+    Timer {
+        id: searchDebounce
+        interval: 300
+        onTriggered: model.search(searchText)
+    }
+    
+    TextField {
+        onTextChanged: {
+            searchText = text
+            searchDebounce.restart()  // Debounce search
         }
     }
 }
@@ -1098,64 +933,56 @@ ListView {
 
 ---
 
-### Practice 4: Debounce Frequent Updates
+### Practice 5: Use Image Providers for Dynamic Images
 
 ```cpp
-// ✓ GOOD: Debounce in model
-class Model : public QObject {
-    Q_OBJECT
-    
+// C++ Image Provider
+class IconProvider : public QQuickImageProvider {
 public:
-    void onDataChanged() {
-        // Debounce updates
-        m_updateTimer.stop();
-        m_updateTimer.start();
-    }
+    IconProvider() : QQuickImageProvider(QQuickImageProvider::Pixmap) {}
     
-private:
-    void scheduleUpdate() {
-        m_updateTimer = new QTimer(this);
-        m_updateTimer->setInterval(100);
-        m_updateTimer->setSingleShot(true);
-        connect(m_updateTimer, &QTimer::timeout, [this]() {
-            emit dataChanged();
-        });
+    QPixmap requestPixmap(const QString &id, QSize *size, 
+                         const QSize &requestedSize) override {
+        // Generate/cache icons
+        return generateIcon(id, requestedSize);
     }
-    
-    QTimer *m_updateTimer;
 };
+
+// Register
+engine.addImageProvider("icons", new IconProvider());
+```
+
+```qml
+// Use in QML
+Image {
+    source: "image://icons/volume"  // Fast!
+}
 ```
 
 ---
 
 ## Error Handling
 
-### Pattern 1: Graceful Degradation
+### Pattern 1: Model Error Handling
 
 ```cpp
-// ✓ GOOD: Handle missing features
-class Model : public QObject {
+class RobustModel : public QObject {
     Q_OBJECT
-    Q_PROPERTY(bool featureAvailable READ featureAvailable CONSTANT)
+    Q_PROPERTY(bool hasError READ hasError NOTIFY errorChanged)
     Q_PROPERTY(QString errorMessage READ errorMessage NOTIFY errorChanged)
     
 public:
-    bool featureAvailable() const {
-        return checkFeatureAvailability();
-    }
+    bool hasError() const { return m_hasError; }
+    QString errorMessage() const { return m_errorMessage; }
     
-    Q_INVOKABLE void useFeature() {
-        if (!featureAvailable()) {
-            m_errorMessage = "Feature not available on this system";
-            emit errorChanged();
-            return;
-        }
+    Q_INVOKABLE void performAction() {
+        clearError();
         
         try {
-            performFeature();
+            // Risky operation
+            doSomethingRisky();
         } catch (const std::exception &e) {
-            m_errorMessage = e.what();
-            emit errorChanged();
+            setError(e.what());
         }
     }
     
@@ -1163,80 +990,148 @@ signals:
     void errorChanged();
     
 private:
+    void setError(const QString &message) {
+        m_hasError = true;
+        m_errorMessage = message;
+        emit errorChanged();
+    }
+    
+    void clearError() {
+        if (m_hasError) {
+            m_hasError = false;
+            m_errorMessage.clear();
+            emit errorChanged();
+        }
+    }
+    
+    bool m_hasError = false;
     QString m_errorMessage;
 };
 ```
 
+**QML Error Display:**
 ```qml
-// View with fallback
-Column {
-    Button {
-        text: "Use Feature"
-        enabled: model.featureAvailable
-        onClicked: model.useFeature()
-    }
-    
-    Text {
-        text: model.featureAvailable 
-            ? "Feature ready" 
-            : "Feature not available"
-        color: model.featureAvailable ? "green" : "orange"
-    }
-    
-    Text {
-        text: model.errorMessage
-        color: "red"
-        visible: model.errorMessage
+Rectangle {
+    Column {
+        spacing: 10
+        
+        Button {
+            text: "Do Action"
+            onClicked: model.performAction()
+        }
+        
+        // Error banner
+        Rectangle {
+            visible: model.hasError
+            color: "#ff5555"
+            height: 40
+            
+            Text {
+                anchors.centerIn: parent
+                text: model.errorMessage
+                color: "white"
+            }
+        }
     }
 }
 ```
 
 ---
 
-### Pattern 2: Validation Before Action
+### Pattern 2: Graceful Fallback
 
 ```cpp
-// ✓ GOOD: Validate before executing
-class ActionModel : public QObject {
+int main(int argc, char *argv[]) {
+    QGuiApplication app(argc, argv);
+    
+    // Check layer shell availability
+    if (!LayerShellQt::Shell::isAvailable()) {
+        qWarning() << "Layer shell not available, using fallback";
+        
+        // Fallback: Create normal window
+        QQuickView view;
+        view.setSource(QUrl("qrc:/FallbackView.qml"));
+        view.setFlags(Qt::Tool | Qt::FramelessWindowHint | 
+                     Qt::WindowStaysOnTopHint);
+        view.show();
+        
+        return app.exec();
+    }
+    
+    // Normal layer shell path
+    // ...
+}
+```
+
+---
+
+### Pattern 3: Input Validation
+
+```cpp
+class ValidatedModel : public QObject {
     Q_OBJECT
+    Q_PROPERTY(QString password READ password WRITE setPassword NOTIFY passwordChanged)
+    Q_PROPERTY(bool isValid READ isValid NOTIFY isValidChanged)
+    Q_PROPERTY(QString validationError READ validationError NOTIFY isValidChanged)
     
 public:
-    Q_INVOKABLE bool canExecute(const QString &action) const {
-        if (action == "screenshot") {
-            return hasScreenshotTool();
-        } else if (action == "lock") {
-            return hasLockScreen();
-        }
-        return false;
+    void setPassword(const QString &password) {
+        m_password = password;
+        validate();
+        emit passwordChanged();
     }
     
-    Q_INVOKABLE void execute(const QString &action) {
-        if (!canExecute(action)) {
-            emit executionFailed(action, "Action not available");
-            return;
-        }
-        
-        // Execute
-        doAction(action);
-        emit executionSucceeded(action);
-    }
+    bool isValid() const { return m_isValid; }
+    QString validationError() const { return m_validationError; }
     
 signals:
-    void executionSucceeded(const QString &action);
-    void executionFailed(const QString &action, const QString &reason);
+    void passwordChanged();
+    void isValidChanged();
+    
+private:
+    void validate() {
+        if (m_password.length() < 6) {
+            m_isValid = false;
+            m_validationError = "Password must be at least 6 characters";
+        } else if (!m_password.contains(QRegExp("[0-9]"))) {
+            m_isValid = false;
+            m_validationError = "Password must contain a number";
+        } else {
+            m_isValid = true;
+            m_validationError.clear();
+        }
+        emit isValidChanged();
+    }
+    
+    QString m_password;
+    bool m_isValid = false;
+    QString m_validationError;
 };
 ```
 
+**QML:**
 ```qml
-// View
-Button {
-    text: "Take Screenshot"
-    enabled: actionModel.canExecute("screenshot")
+Column {
+    TextField {
+        id: passwordField
+        echoMode: TextInput.Password
+        onTextChanged: model.password = text
+        
+        background: Rectangle {
+            border.color: model.isValid ? "green" : "red"
+        }
+    }
     
-    onClicked: actionModel.execute("screenshot")
+    Text {
+        text: model.validationError
+        color: "red"
+        visible: !model.isValid
+    }
     
-    ToolTip.visible: !enabled
-    ToolTip.text: "Screenshot tool not available"
+    Button {
+        text: "Submit"
+        enabled: model.isValid
+    }
 }
 ```
 
@@ -1244,309 +1139,426 @@ Button {
 
 ## Testing Strategies
 
-### Strategy 1: Test Models Independently
+### Strategy 1: Unit Test Models
 
 ```cpp
-// Test C++ model
-class ModelTest : public QObject {
+// test_model.cpp
+#include <QtTest/QtTest>
+#include "PanelModel.h"
+
+class TestPanelModel : public QObject {
     Q_OBJECT
     
 private slots:
-    void testPropertyBinding() {
+    void testTimeUpdate() {
         PanelModel model;
+        
         QSignalSpy spy(&model, &PanelModel::timeChanged);
         
-        model.updateTime();
+        // Wait for update
+        QVERIFY(spy.wait(2000));
         
-        QCOMPARE(spy.count(), 1);
-        QVERIFY(!model.currentTime().isEmpty());
+        // Check time format
+        QString time = model.currentTime();
+        QVERIFY(QTime::fromString(time, "hh:mm:ss").isValid());
     }
     
-    void testAction() {
-        ActionModel model;
-        QSignalSpy successSpy(&model, &ActionModel::actionCompleted);
+    void testPropertyBinding() {
+        PanelModel model;
         
-        model.executeAction("test");
-        
-        QCOMPARE(successSpy.count(), 1);
+        // Test property read
+        QString time = model.currentTime();
+        QVERIFY(!time.isEmpty());
     }
 };
 
-QTEST_MAIN(ModelTest)
+QTEST_MAIN(TestPanelModel)
+#include "test_model.moc"
 ```
 
 ---
 
-### Strategy 2: QML Tests
+### Strategy 2: Test QML with QQuickTest
+
+```cpp
+// test_qml.cpp
+#include <QtQuickTest/quicktest.h>
+
+QUICK_TEST_MAIN(qml_tests)
+```
 
 ```qml
-// TestPanel.qml
+// tst_Panel.qml
 import QtQuick 2.15
 import QtTest 1.15
 
 TestCase {
     name: "PanelTests"
     
-    Panel {
-        id: panel
-    }
-    
-    function test_initialization() {
-        verify(panel.width > 0)
-        verify(panel.height > 0)
-    }
-    
-    function test_button_click() {
-        var button = findChild(panel, "myButton")
-        verify(button !== null)
+    Component {
+        id: panelComponent
         
-        mouseClick(button)
-        // Verify action occurred
+        Panel {
+            id: panel
+        }
+    }
+    
+    function test_panelSize() {
+        var panel = createTemporaryObject(panelComponent, testCase)
+        compare(panel.height, 35)
+    }
+    
+    function test_clockUpdates() {
+        var panel = createTemporaryObject(panelComponent, testCase)
+        var initialTime = panel.clockText
+        wait(1100)  // Wait > 1 second
+        verify(panel.clockText !== initialTime)
     }
 }
 ```
 
 ---
 
-### Strategy 3: Mock Models for UI Testing
+### Strategy 3: Mock Models for Testing
 
 ```cpp
-// MockModel for UI testing
-class MockPanelModel : public QObject {
+// MockModel.h
+class MockPanelModel : public PanelModel {
     Q_OBJECT
-    Q_PROPERTY(QString currentTime READ currentTime CONSTANT)
     
 public:
-    QString currentTime() const { return "12:34:56"; }
+    void setMockTime(const QString &time) {
+        m_mockTime = time;
+        emit timeChanged();
+    }
+    
+    QString currentTime() const override {
+        return m_mockTime.isEmpty() ? PanelModel::currentTime() : m_mockTime;
+    }
+    
+private:
+    QString m_mockTime;
 };
 ```
 
+**Test with mock:**
 ```cpp
-// Test with mock
-void testUI() {
-    MockPanelModel mockModel;
+MockPanelModel mockModel;
+mockModel.setMockTime("12:34:56");
+
+QQuickView view;
+view.rootContext()->setContextProperty("panelModel", &mockModel);
+// Test UI with known data
+```
+
+---
+
+### Strategy 4: Integration Tests
+
+```cpp
+class IntegrationTest : public QObject {
+    Q_OBJECT
     
-    QQuickView view;
-    view.rootContext()->setContextProperty("panelModel", &mockModel);
-    view.setSource(QUrl("qrc:/Panel.qml"));
+private slots:
+    void initTestCase() {
+        if (!LayerShellQt::Shell::isAvailable()) {
+            QSKIP("Layer shell not available");
+        }
+    }
     
-    // Test UI behavior with known data
-}
+    void testPanelCreation() {
+        PanelModel model;
+        
+        QQuickView view;
+        view.rootContext()->setContextProperty("panelModel", &model);
+        view.setSource(QUrl("qrc:/Panel.qml"));
+        
+        auto layerWindow = LayerShellQt::Window::get(&view);
+        layerWindow->setLayer(LayerShellQt::Window::LayerTop);
+        
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+        
+        // Check layer configuration
+        QCOMPARE(layerWindow->layer(), LayerShellQt::Window::LayerTop);
+    }
+};
 ```
 
 ---
 
 ## Common Pitfalls
 
-### Pitfall 1: Forgetting NOTIFY Signals
+### Pitfall 1: Setting Properties After Show
 
+✗ **WRONG:**
 ```cpp
-// ✗ BAD: No NOTIFY signal
-Q_PROPERTY(QString text READ text)
-
-// QML won't update when text changes!
+view.show();
+auto layerWindow = LayerShellQt::Window::get(&view);
+layerWindow->setLayer(LayerTop);  // Too late!
 ```
 
+✅ **CORRECT:**
 ```cpp
-// ✓ GOOD: With NOTIFY
-Q_PROPERTY(QString text READ text NOTIFY textChanged)
-
-signals:
-    void textChanged();
+auto layerWindow = LayerShellQt::Window::get(&view);
+layerWindow->setLayer(LayerTop);
+view.show();  // Configure first, then show
 ```
 
 ---
 
 ### Pitfall 2: Complex Logic in QML
 
+✗ **WRONG:**
 ```qml
-// ✗ BAD: Business logic in QML
-Button {
-    onClicked: {
-        // Complex calculations
-        var result = 0;
-        for (var i = 0; i < data.length; i++) {
-            result += calculateValue(data[i]);
+Rectangle {
+    property var data: []
+    
+    Text {
+        text: {
+            // Heavy calculation in QML - BAD!
+            var sum = 0;
+            for (var i = 0; i < data.length; i++) {
+                sum += complexCalculation(data[i]);
+            }
+            return sum;
         }
-        // Database operations
-        saveToDatabase(result);
-        // Network requests
-        sendToServer(result);
     }
 }
 ```
 
+✅ **CORRECT:**
 ```cpp
-// ✓ GOOD: Logic in C++
+// Do it in C++ model
 class Model : public QObject {
-    Q_INVOKABLE void processData() {
+    Q_PROPERTY(int sum READ sum NOTIFY sumChanged)
+    
+    int sum() const {
         int result = 0;
-        for (const Data &d : m_data) {
-            result += calculateValue(d);
+        for (const auto &item : m_data) {
+            result += complexCalculation(item);
         }
-        saveToDatabase(result);
-        sendToServer(result);
-        emit dataProcessed();
+        return result;
     }
 };
 ```
 
 ```qml
-// ✓ GOOD: Simple action in QML
-Button {
-    onClicked: model.processData()
+Text {
+    text: model.sum  // Simple binding
 }
 ```
 
 ---
 
-### Pitfall 3: Not Using LayerShellQt Correctly
+### Pitfall 3: Missing NOTIFY Signals
 
+✗ **WRONG:**
 ```cpp
-// ✗ BAD: Configure after show
-view.show();
-auto layerWindow = LayerShellQt::Window::get(&view);
-layerWindow->setLayer(LayerTop);  // Too late!
+class Model : public QObject {
+    Q_OBJECT
+    Q_PROPERTY(QString text READ text)  // Missing NOTIFY!
+    
+    QString text() const { return m_text; }
+    void setText(const QString &text) {
+        m_text = text;
+        // No emit! QML won't update!
+    }
+};
 ```
 
+✅ **CORRECT:**
 ```cpp
-// ✓ GOOD: Configure before show
-auto layerWindow = LayerShellQt::Window::get(&view);
-layerWindow->setLayer(LayerTop);
-view.show();
+class Model : public QObject {
+    Q_OBJECT
+    Q_PROPERTY(QString text READ text NOTIFY textChanged)
+    
+signals:
+    void textChanged();
+    
+private:
+    void setText(const QString &text) {
+        if (m_text != text) {
+            m_text = text;
+            emit textChanged();  // QML updates automatically
+        }
+    }
+};
 ```
 
 ---
 
-### Pitfall 4: Memory Leaks with QML Objects
+### Pitfall 4: Not Using roleNames()
+
+✗ **WRONG:**
+```cpp
+class ListModel : public QAbstractListModel {
+    // Missing roleNames()!
+    QVariant data(const QModelIndex &index, int role) const override {
+        // ...
+    }
+};
+```
 
 ```qml
-// ✗ BAD: Creating objects without parent
-Button {
-    onClicked: {
-        var obj = Qt.createQmlObject('import QtQuick 2.15; Rectangle {}', root)
-        // obj has no parent, will leak!
+Repeater {
+    model: listModel
+    delegate: Text {
+        text: ???  // Can't access data!
     }
 }
 ```
 
+✅ **CORRECT:**
+```cpp
+class ListModel : public QAbstractListModel {
+    enum Roles {
+        NameRole = Qt::UserRole + 1
+    };
+    
+    QHash<int, QByteArray> roleNames() const override {
+        return {{NameRole, "name"}};
+    }
+    
+    QVariant data(const QModelIndex &index, int role) const override {
+        if (role == NameRole) return m_items[index.row()].name;
+        return QVariant();
+    }
+};
+```
+
 ```qml
-// ✓ GOOD: Proper ownership
-Button {
-    onClicked: {
-        var obj = Qt.createQmlObject(
-            'import QtQuick 2.15; Rectangle {}', 
-            root  // parent
-        )
+Repeater {
+    model: listModel
+    delegate: Text {
+        text: model.name  // Works!
     }
 }
 ```
 
 ---
 
-### Pitfall 5: Blocking UI Thread
+### Pitfall 5: Memory Leaks with QML Objects
 
+✗ **WRONG:**
 ```cpp
-// ✗ BAD: Long operation on UI thread
+void createView() {
+    QQuickView *view = new QQuickView();  // Never deleted!
+    view->show();
+}
+```
+
+✅ **CORRECT:**
+```cpp
+class Manager : public QObject {
+    QList<QQuickView*> m_views;
+    
+public:
+    ~Manager() {
+        qDeleteAll(m_views);  // Cleanup
+    }
+    
+    void createView() {
+        QQuickView *view = new QQuickView();
+        m_views.append(view);
+        view->show();
+    }
+};
+```
+
+---
+
+### Pitfall 6: Blocking Main Thread
+
+✗ **WRONG:**
+```cpp
 Q_INVOKABLE void loadData() {
-    QThread::sleep(5);  // BLOCKS UI!
-    m_data = fetchData();
+    // Blocking operation in main thread!
+    QThread::sleep(5);  // UI freezes!
+    m_data = loadHugeFile();
     emit dataChanged();
 }
 ```
 
+✅ **CORRECT:**
 ```cpp
-// ✓ GOOD: Async operation
 Q_INVOKABLE void loadData() {
-    QtConcurrent::run([this]() {
-        QString data = fetchData();  // Background thread
-        
-        QMetaObject::invokeMethod(this, [this, data]() {
-            m_data = data;
-            emit dataChanged();
-        }, Qt::QueuedConnection);
+    // Use QFuture
+    auto future = QtConcurrent::run([this]() {
+        return loadHugeFile();
     });
+    
+    auto watcher = new QFutureWatcher<Data>(this);
+    connect(watcher, &QFutureWatcher<Data>::finished, [this, watcher]() {
+        m_data = watcher->result();
+        emit dataChanged();
+        watcher->deleteLater();
+    });
+    watcher->setFuture(future);
 }
 ```
 
 ---
 
-## Checklist: Before Production
+## Checklist: Production Ready
 
-### Architecture
-- [ ] Models separate from views
-- [ ] Business logic in C++
-- [ ] UI in QML
-- [ ] Clear data flow
-
-### LayerShellQt
-- [ ] Check `isAvailable()` at startup
-- [ ] Configure before `show()`
-- [ ] Appropriate layer for use case
-- [ ] Correct anchor configuration
-- [ ] Proper exclusive zone
-
-### Models
+### Model Checklist
 - [ ] All properties have NOTIFY signals
-- [ ] Q_INVOKABLE for actions
-- [ ] Input validation
-- [ ] Error handling
-- [ ] Async for long operations
+- [ ] Q_INVOKABLE methods for QML actions
+- [ ] Error handling in place
+- [ ] No blocking operations in main thread
+- [ ] Proper signal/slot connections
+- [ ] Memory management (ownership clear)
 
-### QML
-- [ ] Use property bindings
-- [ ] No complex JavaScript
-- [ ] Component composition
-- [ ] Loaders for heavy content
-- [ ] Proper ownership
+### QML Checklist
+- [ ] No complex logic in bindings
+- [ ] Components broken down (reusable)
+- [ ] Proper state management
+- [ ] Animations for transitions
+- [ ] Accessibility properties set
+- [ ] Keyboard navigation works
 
-### Performance
+### LayerShell Checklist
+- [ ] Configuration before show()
+- [ ] Appropriate layer chosen
+- [ ] Exclusive zone set correctly
+- [ ] Keyboard interactivity appropriate
+- [ ] Tested on target compositor
+
+### Performance Checklist
+- [ ] Heavy components use Loader
+- [ ] No unnecessary bindings
+- [ ] Images optimized/cached
+- [ ] Repeater/ListView optimized
 - [ ] No blocking operations
-- [ ] Optimized list views
-- [ ] Minimal property bindings
-- [ ] Debounced updates
 
-### Testing
-- [ ] Unit tests for models
+### Testing Checklist
+- [ ] Model unit tests written
 - [ ] QML tests for UI
-- [ ] Mock models for testing
-- [ ] Integration tests
-
-### Error Handling
-- [ ] Graceful degradation
-- [ ] User-friendly errors
-- [ ] Logging
-- [ ] Recovery mechanisms
+- [ ] Integration tests pass
+- [ ] Tested on multiple compositors
+- [ ] Error cases handled
 
 ---
 
 ## Summary: Golden Rules
 
-### Model-View
-1. **Separate concerns**: Model (C++) vs View (QML)
-2. **Data flows down**: Model → QML via properties
-3. **Events flow up**: QML → Model via Q_INVOKABLE
-
-### LayerShellQt
-4. **Configure early**: Before show()
-5. **Choose wisely**: Right layer for use case
-6. **Reserve space**: Exclusive zones for panels
-
-### QML
-7. **Bind, don't set**: Use property bindings
-8. **Compose**: Break into components
-9. **Keep simple**: No complex logic
-
-### C++
-10. **Expose minimally**: Only what QML needs
-11. **Signal changes**: Always emit NOTIFY
-12. **Validate input**: Before executing
-
-### Performance
-13. **Don't block**: Async for long ops
-14. **Lazy load**: Use Loaders
-15. **Optimize lists**: cacheBuffer, reuseItems
+1. **Separate Model from View** - Logic in C++, UI in QML
+2. **Configure before show()** - LayerShell setup before display
+3. **Use appropriate model type** - QObject vs QAbstractListModel
+4. **Emit NOTIFY signals** - Required for QML bindings
+5. **Keep QML simple** - Complex logic belongs in model
+6. **Test models independently** - Unit tests for business logic
+7. **Optimize performance** - Use Loader, cache, debounce
+8. **Handle errors gracefully** - Fallbacks and validation
+9. **Clean up resources** - Proper memory management
+10. **Follow Qt best practices** - Modern Qt style
 
 ---
 
-**Happy coding với clean Model-View architecture! 🎨**
+## Next Steps
+
+You're now ready for production! Check:
+- **[06-quick-reference.md](./06-quick-reference.md)** - Quick lookup reference
+
+**Build amazing desktop UIs with clean architecture! 🎨**
