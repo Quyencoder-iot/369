@@ -1,10 +1,10 @@
-# LayerShellQt - Best Practices & Design Patterns
+# LayerShellQt - Best Practices & Design Patterns (QML + Model-View)
 
 ## Mục Lục
 1. [Design Principles](#design-principles)
-2. [Coding Patterns](#coding-patterns)
-3. [UI/UX Guidelines](#uiux-guidelines)
-4. [Performance Best Practices](#performance-best-practices)
+2. [Model-View Patterns](#model-view-patterns)
+3. [QML Best Practices](#qml-best-practices)
+4. [Performance Optimization](#performance-optimization)
 5. [Error Handling](#error-handling)
 6. [Testing Strategies](#testing-strategies)
 7. [Common Pitfalls](#common-pitfalls)
@@ -13,577 +13,809 @@
 
 ## Design Principles
 
-### Principle 1: Configure Before Show
+### Principle 1: Separation of Concerns
 
-**Always set layer shell properties BEFORE showing window!**
+**Model (C++) = Business Logic, View (QML) = UI**
+
+```cpp
+// ✓ GOOD: Clear separation
+// Model.h - Business logic only
+class PanelModel : public QObject {
+    Q_OBJECT
+    Q_PROPERTY(QString time READ time NOTIFY timeChanged)
+    
+private:
+    void updateTime() {
+        m_time = QTime::currentTime().toString();
+        emit timeChanged();
+    }
+};
+```
+
+```qml
+// View.qml - UI only
+Rectangle {
+    Text {
+        text: panelModel.time  // Data binding
+        color: "white"
+    }
+}
+```
+
+```cpp
+// ✗ BAD: Mixed concerns (old QWidget way)
+class Panel : public QWidget {
+    void updateUI() {
+        // Logic + UI mixed
+        QString time = QTime::currentTime().toString();
+        m_label->setText(time);  // Direct UI manipulation
+    }
+};
+```
+
+**Rule:** Model không biết về UI, View không có business logic.
+
+---
+
+### Principle 2: Configure Layer Shell Before Show
+
+**Không đổi!** Vẫn phải configure LayerShellQt trước khi show.
 
 ```cpp
 // ✓ GOOD
-QWidget *panel = new QWidget();
-auto layerWindow = LayerShellQt::Window::get(panel->windowHandle());
-layerWindow->setLayer(LayerTop);
-layerWindow->setAnchors(AnchorTop | AnchorLeft | AnchorRight);
-panel->show();
+QQuickView view;
+auto layerWindow = LayerShellQt::Window::get(&view);
+layerWindow->setLayer(LayerTop);  // Configure first
+view.show();  // Then show
 
 // ✗ BAD
-QWidget *panel = new QWidget();
-panel->show();  // Too late!
-auto layerWindow = LayerShellQt::Window::get(panel->windowHandle());
-layerWindow->setLayer(LayerTop);  // Won't work
+view.show();
+layerWindow->setLayer(LayerTop);  // Too late!
 ```
 
 ---
 
-### Principle 2: Use Appropriate Layer
+### Principle 3: Use Appropriate Layer
 
-**Choose layer theo use case:**
+Không đổi từ version cũ, nhưng apply cho QML:
 
-| Use Case | Layer | Reasoning |
-|----------|-------|-----------|
-| Panel | TOP | Above apps, exclusive zone |
-| Dock | TOP | Above apps, exclusive zone |
-| Notification | TOP | Above apps, no exclusive zone |
-| Widget | BOTTOM | Below apps, decorative |
-| Wallpaper | BACKGROUND | Lowest layer |
-| Lock screen | OVERLAY | Block everything |
-| Screen keyboard | OVERLAY | Must be accessible always |
+| Use Case | Layer | QML View |
+|----------|-------|----------|
+| Panel | TOP | Panel.qml with exclusive zone |
+| Dock | TOP | Dock.qml with app list |
+| Widget | BOTTOM | Widget.qml, passive |
+| Wallpaper | BACKGROUND | Wallpaper.qml, animated |
+| Lock Screen | OVERLAY | LockScreen.qml, full screen |
 
-**Anti-pattern:**
-```cpp
-// ✗ DON'T use OVERLAY for normal UI
-layerWindow->setLayer(LayerOverlay);  // Too aggressive for a panel!
+---
 
-// ✓ DO use TOP for panels
-layerWindow->setLayer(LayerTop);
+### Principle 4: Declarative UI Over Imperative
+
+**QML là declarative - embrace it!**
+
+```qml
+// ✓ GOOD: Declarative
+Rectangle {
+    color: panelModel.isActive ? "#4fc3f7" : "#2d2d2d"
+    
+    Behavior on color {
+        ColorAnimation { duration: 200 }
+    }
+}
+```
+
+```qml
+// ✗ BAD: Imperative (fighting QML)
+Rectangle {
+    id: rect
+    
+    Connections {
+        target: panelModel
+        onIsActiveChanged: {
+            if (panelModel.isActive) {
+                rect.color = "#4fc3f7"
+            } else {
+                rect.color = "#2d2d2d"
+            }
+        }
+    }
+}
 ```
 
 ---
 
-### Principle 3: Match Exclusive Zone to Purpose
+### Principle 5: Data Binding Over Manual Updates
 
-**Reserve space only when needed:**
-
-```cpp
-// ✓ Panel - reserve space
-layerWindow->setExclusiveZone(30);
-
-// ✓ Notification - overlay mode, no reservation
-layerWindow->setExclusiveZone(0);
-
-// ✓ Auto-calculate
-layerWindow->setExclusiveZone(-1);
+```qml
+// ✓ GOOD: Automatic binding
+Text {
+    text: panelModel.currentTime  // Auto-updates!
+}
 ```
 
-**Rule:** If users should not interact under your window → use exclusive zone.
-
----
-
-### Principle 4: Minimize Keyboard Grab
-
-**Only use keyboard interactivity when necessary:**
-
 ```cpp
-// ✓ Wallpaper - no keyboard needed
-layerWindow->setKeyboardInteractivity(KeyboardInteractivityNone);
-
-// ✓ Panel with search - needs keyboard
-layerWindow->setKeyboardInteractivity(KeyboardInteractivityExclusive);
-
-// ✗ DON'T grab keyboard unnecessarily
-// Makes other apps unresponsive!
+// ✗ BAD: Manual updates (old way)
+void updateUI() {
+    label->setText(model.currentTime());  // Manual
+}
 ```
 
 ---
 
-## Coding Patterns
+## Model-View Patterns
 
-### Pattern 1: Base Layer Window Class
+### Pattern 1: Simple Property Model
 
-**Create reusable base class:**
+**Use case:** Single values (strings, numbers, booleans)
 
 ```cpp
-class LayerWindow : public QWidget {
+// SimpleModel.h
+class SimpleModel : public QObject {
     Q_OBJECT
+    Q_PROPERTY(QString title READ title WRITE setTitle NOTIFY titleChanged)
+    Q_PROPERTY(bool enabled READ enabled NOTIFY enabledChanged)
+    Q_PROPERTY(int value READ value NOTIFY valueChanged)
+    
 public:
-    LayerWindow(QWidget *parent = nullptr) : QWidget(parent) {
-        setupLayerShell();
+    SimpleModel(QObject *parent = nullptr) : QObject(parent) {}
+    
+    QString title() const { return m_title; }
+    void setTitle(const QString &title) {
+        if (m_title != title) {
+            m_title = title;
+            emit titleChanged();
+        }
     }
     
-    virtual ~LayerWindow() = default;
+    bool enabled() const { return m_enabled; }
+    int value() const { return m_value; }
     
-protected:
-    virtual void setupLayerShell() {
-        // Default config - override in subclass
-        auto layerWindow = LayerShellQt::Window::get(windowHandle());
-        layerWindow->setLayer(defaultLayer());
-        layerWindow->setAnchors(defaultAnchors());
-        layerWindow->setExclusiveZone(defaultExclusiveZone());
-        layerWindow->setKeyboardInteractivity(defaultKeyboardMode());
-    }
+signals:
+    void titleChanged();
+    void enabledChanged();
+    void valueChanged();
     
-    virtual LayerShellQt::Window::Layer defaultLayer() const {
-        return LayerShellQt::Window::LayerTop;
-    }
-    
-    virtual LayerShellQt::Window::Anchors defaultAnchors() const {
-        return LayerShellQt::Window::AnchorTop | 
-               LayerShellQt::Window::AnchorLeft | 
-               LayerShellQt::Window::AnchorRight;
-    }
-    
-    virtual int defaultExclusiveZone() const {
-        return 0;
-    }
-    
-    virtual LayerShellQt::Window::KeyboardInteractivity defaultKeyboardMode() const {
-        return LayerShellQt::Window::KeyboardInteractivityNone;
-    }
-    
-    LayerShellQt::Window* layerWindow() {
-        return LayerShellQt::Window::get(windowHandle());
-    }
+private:
+    QString m_title;
+    bool m_enabled = true;
+    int m_value = 0;
 };
 ```
 
-**Usage:**
-```cpp
-class MyPanel : public LayerWindow {
-protected:
-    LayerShellQt::Window::Layer defaultLayer() const override {
-        return LayerShellQt::Window::LayerTop;
+```qml
+// View.qml
+Rectangle {
+    Text {
+        text: model.title
+        color: model.enabled ? "white" : "gray"
     }
     
-    int defaultExclusiveZone() const override {
-        return 35;
+    ProgressBar {
+        value: model.value / 100
     }
-};
+}
 ```
 
 ---
 
-### Pattern 2: Configuration Builder
+### Pattern 2: List Model
 
-**Fluent interface for configuration:**
+**Use case:** Dynamic lists (docks, menus, notifications)
 
 ```cpp
-class LayerWindowBuilder {
+// ListItemModel.h
+class AppListModel : public QAbstractListModel {
+    Q_OBJECT
+    
 public:
-    explicit LayerWindowBuilder(QWindow *window) : m_window(window) {
-        m_layerWindow = LayerShellQt::Window::get(window);
+    enum Roles {
+        NameRole = Qt::UserRole + 1,
+        IconRole,
+        CommandRole
+    };
+    
+    struct App {
+        QString name;
+        QString icon;
+        QString command;
+    };
+    
+    int rowCount(const QModelIndex &parent = QModelIndex()) const override {
+        Q_UNUSED(parent);
+        return m_apps.count();
     }
     
-    LayerWindowBuilder& layer(LayerShellQt::Window::Layer layer) {
-        m_layerWindow->setLayer(layer);
-        return *this;
+    QVariant data(const QModelIndex &index, int role) const override {
+        if (!index.isValid() || index.row() >= m_apps.count())
+            return QVariant();
+        
+        const App &app = m_apps.at(index.row());
+        switch (role) {
+        case NameRole: return app.name;
+        case IconRole: return app.icon;
+        case CommandRole: return app.command;
+        }
+        return QVariant();
     }
     
-    LayerWindowBuilder& anchors(LayerShellQt::Window::Anchors anchors) {
-        m_layerWindow->setAnchors(anchors);
-        return *this;
+    QHash<int, QByteArray> roleNames() const override {
+        return {
+            {NameRole, "name"},
+            {IconRole, "icon"},
+            {CommandRole, "command"}
+        };
     }
     
-    LayerWindowBuilder& exclusiveZone(int zone) {
-        m_layerWindow->setExclusiveZone(zone);
-        return *this;
+    Q_INVOKABLE void addApp(const QString &name, const QString &icon, const QString &cmd) {
+        beginInsertRows(QModelIndex(), m_apps.count(), m_apps.count());
+        m_apps.append({name, icon, cmd});
+        endInsertRows();
     }
     
-    LayerWindowBuilder& margins(const QMargins &margins) {
-        m_layerWindow->setMargins(margins);
-        return *this;
-    }
-    
-    LayerWindowBuilder& keyboard(LayerShellQt::Window::KeyboardInteractivity mode) {
-        m_layerWindow->setKeyboardInteractivity(mode);
-        return *this;
-    }
-    
-    LayerWindowBuilder& scope(const QString &scope) {
-        m_layerWindow->setScope(scope);
-        return *this;
-    }
-    
-    LayerShellQt::Window* build() {
-        return m_layerWindow;
+    Q_INVOKABLE void removeApp(int index) {
+        if (index >= 0 && index < m_apps.count()) {
+            beginRemoveRows(QModelIndex(), index, index);
+            m_apps.removeAt(index);
+            endRemoveRows();
+        }
     }
     
 private:
-    QWindow *m_window;
-    LayerShellQt::Window *m_layerWindow;
+    QList<App> m_apps;
+};
+```
+
+```qml
+// Dock.qml
+Rectangle {
+    RowLayout {
+        Repeater {
+            model: appListModel  // Bind to list model
+            
+            delegate: Button {
+                text: model.icon
+                ToolTip.text: model.name
+                
+                onClicked: {
+                    // Launch app
+                    Qt.application.execute(model.command)
+                }
+            }
+        }
+    }
+}
+```
+
+**Key points:**
+- Use `QAbstractListModel` for lists
+- Define custom roles
+- Implement `roleNames()` for QML access
+- Use `Q_INVOKABLE` for actions
+
+---
+
+### Pattern 3: Action Model
+
+**Use case:** Models với methods (execute actions)
+
+```cpp
+// ActionModel.h
+class PanelActionModel : public QObject {
+    Q_OBJECT
+    
+public:
+    Q_INVOKABLE void showMenu() {
+        // Show application menu
+    }
+    
+    Q_INVOKABLE void launchApp(const QString &appName) {
+        QProcess::startDetached(appName, {});
+    }
+    
+    Q_INVOKABLE void toggleFullscreen() {
+        emit fullscreenRequested();
+    }
+    
+signals:
+    void fullscreenRequested();
+};
+```
+
+```qml
+// Panel.qml
+Rectangle {
+    Button {
+        text: "Menu"
+        onClicked: panelModel.showMenu()
+    }
+    
+    Button {
+        text: "Launch"
+        onClicked: panelModel.launchApp("firefox")
+    }
+}
+```
+
+---
+
+### Pattern 4: Manager Pattern
+
+**Use case:** Manage multiple views (multi-monitor)
+
+```cpp
+// ViewManager.h
+class PanelViewManager : public QObject {
+    Q_OBJECT
+    
+public:
+    PanelViewManager(MyModel *model, QObject *parent = nullptr)
+        : QObject(parent), m_model(model) {
+        
+        // Create views for existing screens
+        for (int i = 0; i < model->screenCount(); ++i) {
+            createViewForScreen(model->getScreenName(i));
+        }
+        
+        // Watch for screen changes
+        connect(model, &MyModel::screenAdded, 
+                this, &PanelViewManager::createViewForScreen);
+        connect(model, &MyModel::screenRemoved,
+                this, &PanelViewManager::removeViewForScreen);
+    }
+    
+    ~PanelViewManager() {
+        qDeleteAll(m_views);
+    }
+    
+private slots:
+    void createViewForScreen(const QString &screenName) {
+        QQuickView *view = new QQuickView();
+        
+        // Expose model to QML
+        view->rootContext()->setContextProperty("model", m_model);
+        view->rootContext()->setContextProperty("screenName", screenName);
+        
+        // Load QML
+        view->setSource(QUrl("qrc:/Panel.qml"));
+        
+        // Configure LayerShell
+        auto layerWindow = LayerShellQt::Window::get(view);
+        layerWindow->setLayer(LayerShellQt::Window::LayerTop);
+        layerWindow->setScope(screenName);  // Per-screen
+        
+        view->show();
+        m_views.insert(screenName, view);
+    }
+    
+    void removeViewForScreen(const QString &screenName) {
+        QQuickView *view = m_views.take(screenName);
+        if (view) view->deleteLater();
+    }
+    
+private:
+    MyModel *m_model;
+    QHash<QString, QQuickView*> m_views;
 };
 ```
 
 **Usage:**
 ```cpp
-QWidget *panel = new QWidget();
-
-LayerWindowBuilder(panel->windowHandle())
-    .layer(LayerShellQt::Window::LayerTop)
-    .anchors(LayerShellQt::Window::AnchorTop | 
-             LayerShellQt::Window::AnchorLeft | 
-             LayerShellQt::Window::AnchorRight)
-    .exclusiveZone(30)
-    .margins(QMargins(5, 0, 5, 0))
-    .keyboard(LayerShellQt::Window::KeyboardInteractivityExclusive)
-    .build();
-
-panel->show();
+int main(int argc, char *argv[]) {
+    QGuiApplication app(argc, argv);
+    
+    MyModel model;
+    PanelViewManager manager(&model);  // Manages all views
+    
+    return app.exec();
+}
 ```
 
 ---
 
-### Pattern 3: Screen Manager
+### Pattern 5: Singleton Model (Global State)
 
-**Centralized multi-monitor management:**
+**Use case:** Shared state across multiple views
 
 ```cpp
-class ScreenManager : public QObject {
+// GlobalModel.h
+class GlobalModel : public QObject {
     Q_OBJECT
+    Q_PROPERTY(QString theme READ theme NOTIFY themeChanged)
+    
 public:
-    using WindowFactory = std::function<QWidget*(QScreen*)>;
-    
-    ScreenManager(WindowFactory factory) : m_factory(factory) {
-        // Create windows for existing screens
-        for (QScreen *screen : QGuiApplication::screens()) {
-            addScreen(screen);
-        }
-        
-        // Watch for screen changes
-        connect(qApp, &QGuiApplication::screenAdded, 
-                this, &ScreenManager::addScreen);
-        connect(qApp, &QGuiApplication::screenRemoved, 
-                this, &ScreenManager::removeScreen);
+    static GlobalModel* instance() {
+        static GlobalModel instance;
+        return &instance;
     }
     
-    QWidget* windowForScreen(QScreen *screen) const {
-        return m_windows.value(screen);
-    }
+    QString theme() const { return m_theme; }
     
-private slots:
-    void addScreen(QScreen *screen) {
-        if (m_windows.contains(screen)) return;
-        
-        QWidget *window = m_factory(screen);
-        m_windows.insert(screen, window);
-        window->show();
-        
-        emit screenAdded(screen, window);
-    }
-    
-    void removeScreen(QScreen *screen) {
-        QWidget *window = m_windows.take(screen);
-        if (window) {
-            window->deleteLater();
-            emit screenRemoved(screen);
+    Q_INVOKABLE void setTheme(const QString &theme) {
+        if (m_theme != theme) {
+            m_theme = theme;
+            emit themeChanged();
         }
     }
     
 signals:
-    void screenAdded(QScreen *screen, QWidget *window);
-    void screenRemoved(QScreen *screen);
+    void themeChanged();
     
 private:
-    WindowFactory m_factory;
-    QHash<QScreen*, QWidget*> m_windows;
+    GlobalModel() = default;
+    QString m_theme = "dark";
 };
+```
+
+```cpp
+// Expose to all views
+view->rootContext()->setContextProperty("globalModel", GlobalModel::instance());
+```
+
+```qml
+// Any view can access
+Rectangle {
+    color: globalModel.theme === "dark" ? "#2d2d2d" : "#f0f0f0"
+}
+```
+
+---
+
+## QML Best Practices
+
+### Practice 1: Component Organization
+
+**Organize QML files by component:**
+
+```
+qml/
+├── components/
+│   ├── Button.qml
+│   ├── Panel.qml
+│   └── Widget.qml
+├── views/
+│   ├── TopPanel.qml
+│   ├── BottomDock.qml
+│   └── LockScreen.qml
+└── main.qml
+```
+
+**Reusable components:**
+```qml
+// components/CustomButton.qml
+import QtQuick 2.15
+import QtQuick.Controls 2.15
+
+Button {
+    id: root
+    
+    property color accentColor: "#4fc3f7"
+    
+    contentItem: Text {
+        text: root.text
+        color: "white"
+        horizontalAlignment: Text.AlignHCenter
+    }
+    
+    background: Rectangle {
+        color: root.hovered ? Qt.lighter(root.accentColor) : root.accentColor
+        radius: 5
+        
+        Behavior on color {
+            ColorAnimation { duration: 150 }
+        }
+    }
+}
 ```
 
 **Usage:**
-```cpp
-ScreenManager manager([](QScreen *screen) -> QWidget* {
-    QWidget *panel = new QWidget();
-    panel->setFixedHeight(30);
-    
-    auto layerWindow = LayerShellQt::Window::get(panel->windowHandle());
-    layerWindow->setLayer(LayerShellQt::Window::LayerTop);
-    layerWindow->setAnchors(LayerShellQt::Window::AnchorTop | 
-                           LayerShellQt::Window::AnchorLeft | 
-                           LayerShellQt::Window::AnchorRight);
-    layerWindow->setExclusiveZone(30);
-    layerWindow->setScope(screen->name());
-    
-    return panel;
-});
+```qml
+// TopPanel.qml
+import "./components"
+
+Rectangle {
+    CustomButton {
+        text: "Menu"
+        accentColor: "#ff5555"
+    }
+}
 ```
 
 ---
 
-### Pattern 4: State-Based Layer Switching
+### Practice 2: Property Aliases
 
-**Use state machine for mode changes:**
+**Expose internal properties:**
 
-```cpp
-class AdaptivePanel : public QWidget {
-    Q_OBJECT
-public:
-    enum Mode {
-        NormalMode,
-        ExpandedMode,
-        FullscreenMode
-    };
+```qml
+// ✓ GOOD: Clean API
+// Panel.qml
+Rectangle {
+    id: root
     
-    void setMode(Mode mode) {
-        if (m_currentMode == mode) return;
-        
-        m_currentMode = mode;
-        applyMode();
+    // Public API
+    property alias title: titleText.text
+    property alias backgroundColor: root.color
+    
+    Text {
+        id: titleText
+        // ... internal implementation
+    }
+}
+
+// Usage
+Panel {
+    title: "My Panel"
+    backgroundColor: "#2d2d2d"
+}
+```
+
+```qml
+// ✗ BAD: Exposing internals
+Panel {
+    children[0].text = "My Panel"  // Fragile!
+}
+```
+
+---
+
+### Practice 3: Layouts Over Absolute Positioning
+
+```qml
+// ✓ GOOD: Responsive layout
+RowLayout {
+    anchors.fill: parent
+    spacing: 10
+    
+    Text { text: "Left" }
+    Item { Layout.fillWidth: true }  // Spacer
+    Text { text: "Right" }
+}
+```
+
+```qml
+// ✗ BAD: Absolute positioning
+Item {
+    Text {
+        x: 10
+        y: 10
+        text: "Left"
     }
     
-private:
-    void applyMode() {
-        auto layerWindow = LayerShellQt::Window::get(windowHandle());
-        
-        switch (m_currentMode) {
-        case NormalMode:
-            setFixedHeight(30);
-            layerWindow->setAnchors(AnchorTop | AnchorLeft | AnchorRight);
-            layerWindow->setExclusiveZone(30);
-            break;
-            
-        case ExpandedMode:
-            setFixedHeight(200);
-            layerWindow->setAnchors(AnchorTop | AnchorLeft | AnchorRight);
-            layerWindow->setExclusiveZone(200);
-            break;
-            
-        case FullscreenMode:
-            layerWindow->setAnchors(AnchorTop | AnchorBottom | 
-                                   AnchorLeft | AnchorRight);
-            layerWindow->setExclusiveZone(-1);
-            break;
+    Text {
+        x: parent.width - 50  // Fragile!
+        y: 10
+        text: "Right"
+    }
+}
+```
+
+---
+
+### Practice 4: Behavior Animations
+
+**Smooth transitions automatically:**
+
+```qml
+Rectangle {
+    color: model.isActive ? "#4fc3f7" : "#2d2d2d"
+    
+    Behavior on color {
+        ColorAnimation { duration: 200 }
+    }
+}
+
+Text {
+    opacity: model.visible ? 1.0 : 0.0
+    
+    Behavior on opacity {
+        NumberAnimation { duration: 300 }
+    }
+}
+```
+
+---
+
+### Practice 5: States for Complex UI
+
+```qml
+Rectangle {
+    id: panel
+    
+    states: [
+        State {
+            name: "collapsed"
+            PropertyChanges { target: panel; height: 35 }
+        },
+        State {
+            name: "expanded"
+            PropertyChanges { target: panel; height: 200 }
+        }
+    ]
+    
+    transitions: Transition {
+        NumberAnimation {
+            properties: "height"
+            duration: 300
+            easing.type: Easing.OutCubic
         }
     }
     
-    Mode m_currentMode = NormalMode;
-};
+    // Change state
+    MouseArea {
+        anchors.fill: parent
+        onClicked: panel.state = (panel.state === "collapsed") ? "expanded" : "collapsed"
+    }
+}
 ```
 
 ---
 
-## UI/UX Guidelines
+### Practice 6: Connections Block
 
-### Guideline 1: Visual Hierarchy
+**Handle model signals cleanly:**
 
-**Use layers to establish visual order:**
-
-```
-OVERLAY: Critical UI (lock screen, emergency alerts)
-    ↓
-TOP: Interactive UI (panels, docks, notifications)
-    ↓
-NORMAL APPS: User applications
-    ↓
-BOTTOM: Passive UI (widgets, monitors)
-    ↓
-BACKGROUND: Wallpapers, effects
-```
-
----
-
-### Guideline 2: Respect User Space
-
-**Don't be intrusive:**
-
-```cpp
-// ✓ GOOD: Small notification, auto-hide
-class PoliteNotification : public QWidget {
-public:
-    PoliteNotification() {
-        setFixedSize(300, 80);  // Reasonable size
+```qml
+Rectangle {
+    Connections {
+        target: panelModel
         
-        auto layerWindow = LayerShellQt::Window::get(windowHandle());
-        layerWindow->setLayer(LayerTop);
-        layerWindow->setAnchors(AnchorTop | AnchorRight);
-        layerWindow->setExclusiveZone(0);  // Don't push apps
+        function onDataUpdated() {
+            console.log("Data updated")
+            // React to signal
+        }
         
-        // Auto-hide after 5s
-        QTimer::singleShot(5000, this, &QWidget::close);
+        function onError(message) {
+            errorDialog.show(message)
+        }
     }
-};
-
-// ✗ BAD: Huge, blocks everything
-class AnnoyingNotification : public QWidget {
-public:
-    AnnoyingNotification() {
-        // Takes entire screen!
-        auto layerWindow = LayerShellQt::Window::get(windowHandle());
-        layerWindow->setLayer(LayerOverlay);
-        layerWindow->setAnchors(AnchorTop | AnchorBottom | AnchorLeft | AnchorRight);
-        layerWindow->setExclusiveZone(-1);
-        
-        // Never closes!
-    }
-};
+}
 ```
 
 ---
 
-### Guideline 3: Consistent Sizing
+## Performance Optimization
 
-**Panel sizes (industry standard):**
-- Small: 24-28px
-- Medium: 30-40px
-- Large: 44-56px
-
-```cpp
-// Follow conventions
-static const int PANEL_HEIGHT_SMALL = 28;
-static const int PANEL_HEIGHT_MEDIUM = 35;
-static const int PANEL_HEIGHT_LARGE = 48;
-```
-
----
-
-### Guideline 4: Responsive to Screen Size
-
-**Adapt to screen dimensions:**
-
-```cpp
-class ResponsivePanel : public QWidget {
-public:
-    ResponsivePanel(QScreen *screen) {
-        // Smaller panel on smaller screens
-        int screenHeight = screen->geometry().height();
-        int panelHeight = screenHeight > 1080 ? 40 : 30;
-        
-        setFixedHeight(panelHeight);
-        
-        auto layerWindow = LayerShellQt::Window::get(windowHandle());
-        layerWindow->setExclusiveZone(panelHeight);
-    }
-};
-```
-
----
-
-### Guideline 5: Accessibility
-
-**Support high DPI, scaling:**
-
-```cpp
-class AccessiblePanel : public QWidget {
-public:
-    AccessiblePanel() {
-        // Use logical pixels, not physical
-        int logicalHeight = 30;  // DPI-independent
-        setFixedHeight(logicalHeight);
-        
-        // Font sizes scale automatically
-        setStyleSheet("font-size: 12pt;");  // Use pt, not px
-        
-        // Handle DPI changes
-        connect(qApp, &QGuiApplication::primaryScreenChanged, 
-                this, &AccessiblePanel::onDPIChanged);
-    }
-};
-```
-
----
-
-## Performance Best Practices
-
-### Practice 1: Minimize Repaints
-
-**Only repaint when necessary:**
-
-```cpp
-class EfficientWidget : public QWidget {
-protected:
-    void updateContent(const QString &newContent) {
-        if (m_content == newContent) return;  // No change
-        
-        m_content = newContent;
-        update();  // Only repaint when changed
-    }
-    
-    void paintEvent(QPaintEvent *event) override {
-        QPainter painter(this);
-        painter.setClipRegion(event->region());  // Clip to damaged region
-        
-        // Paint only what's needed
-    }
-    
-private:
-    QString m_content;
-};
-```
-
----
-
-### Practice 2: Use Double Buffering
-
-**Prevent flicker:**
-
-```cpp
-class SmoothWidget : public QWidget {
-public:
-    SmoothWidget() {
-        setAttribute(Qt::WA_OpaquePaintEvent);
-        setAttribute(Qt::WA_NoSystemBackground);
-    }
-    
-protected:
-    void paintEvent(QPaintEvent *) override {
-        QPainter painter(this);
-        painter.setRenderHint(QPainter::Antialiasing);
-        
-        // Qt automatically double-buffers
-    }
-};
-```
-
----
-
-### Practice 3: Lazy Initialization
+### Optimization 1: Lazy Loading
 
 **Don't create everything upfront:**
 
-```cpp
-class LazyPanel : public QWidget {
-public:
-    LazyPanel() {
-        // Only create visible elements
-        setupBasicUI();
+```qml
+// ✓ GOOD: Lazy loader
+Rectangle {
+    Loader {
+        id: menuLoader
+        active: false
+        source: "Menu.qml"
     }
     
-private:
-    void setupBasicUI() {
-        // Create only essentials
-        m_menuButton = new QPushButton("Menu");
+    Button {
+        text: "Show Menu"
+        onClicked: menuLoader.active = true
+    }
+}
+```
+
+```qml
+// ✗ BAD: Always loaded
+Rectangle {
+    Menu {
+        id: menu
+        visible: false  // Still loaded!
     }
     
-    QMenu* getMenu() {
-        if (!m_menu) {
-            // Create on-demand
-            m_menu = new QMenu(this);
-            populateMenu();
-        }
-        return m_menu;
+    Button {
+        text: "Show Menu"
+        onClicked: menu.visible = true
     }
-    
-    QPushButton *m_menuButton;
-    QMenu *m_menu = nullptr;  // Created lazily
-};
+}
 ```
 
 ---
 
-### Practice 4: Batch Updates
+### Optimization 2: ListView Over Repeater
 
-**Group property changes:**
+**For large lists:**
+
+```qml
+// ✓ GOOD: Efficient for large lists
+ListView {
+    model: appListModel
+    delegate: AppItem {
+        name: model.name
+        icon: model.icon
+    }
+    
+    // Only visible items are created!
+}
+```
+
+```qml
+// ✗ BAD: All items created
+Repeater {
+    model: appListModel  // All 1000 items created!
+    delegate: AppItem { }
+}
+```
+
+---
+
+### Optimization 3: Efficient Property Bindings
+
+```qml
+// ✓ GOOD: Simple binding
+Text {
+    text: model.value
+}
+```
+
+```qml
+// ✗ BAD: Complex expression (recalculated often)
+Text {
+    text: {
+        var result = "";
+        for (var i = 0; i < 1000; i++) {
+            result += model.value + " ";
+        }
+        return result;
+    }
+}
+```
+
+**Solution:** Move complex logic to model:
+```cpp
+// Model
+Q_PROPERTY(QString formattedValue READ formattedValue NOTIFY valueChanged)
+
+QString formattedValue() const {
+    // Complex calculation here
+    return result;
+}
+```
+
+```qml
+Text {
+    text: model.formattedValue  // Simple binding
+}
+```
+
+---
+
+### Optimization 4: Cache Shapes
+
+```qml
+Rectangle {
+    layer.enabled: true  // Cache as texture
+    layer.smooth: true
+    
+    // Complex content
+}
+```
+
+---
+
+### Optimization 5: Model Updates
+
+**Batch model changes:**
 
 ```cpp
-// ✗ BAD: Multiple updates
-layerWindow->setLayer(LayerTop);       // Compositor update
-layerWindow->setAnchors(anchors);      // Compositor update
-layerWindow->setExclusiveZone(30);     // Compositor update
+// ✓ GOOD: Batch updates
+void updateMultipleRows() {
+    emit layoutAboutToBeChanged();
+    // Make multiple changes
+    for (int i = 0; i < 100; ++i) {
+        m_data[i] = newValue;
+    }
+    emit layoutChanged();  // Single update signal
+}
+```
 
-// ✓ GOOD: Qt batches these automatically, but minimize calls
-void configure() {
-    auto layerWindow = LayerShellQt::Window::get(windowHandle());
-    layerWindow->setLayer(LayerTop);
-    layerWindow->setAnchors(anchors);
-    layerWindow->setExclusiveZone(30);
-    // Committed together
+```cpp
+// ✗ BAD: Individual updates
+void updateMultipleRows() {
+    for (int i = 0; i < 100; ++i) {
+        m_data[i] = newValue;
+        emit dataChanged(index(i), index(i));  // 100 signals!
+    }
 }
 ```
 
@@ -591,59 +823,157 @@ void configure() {
 
 ## Error Handling
 
-### Pattern 1: Graceful Fallback
-
-**Handle missing layer shell support:**
+### Pattern 1: Model Error Properties
 
 ```cpp
-class RobustPanel : public QWidget {
+// Model.h
+class SafeModel : public QObject {
+    Q_OBJECT
+    Q_PROPERTY(QString errorMessage READ errorMessage NOTIFY errorChanged)
+    Q_PROPERTY(bool hasError READ hasError NOTIFY errorChanged)
+    
 public:
-    RobustPanel() {
-        if (LayerShellQt::Shell::isAvailable()) {
-            setupLayerShell();
-        } else {
-            setupFallback();
+    QString errorMessage() const { return m_errorMessage; }
+    bool hasError() const { return !m_errorMessage.isEmpty(); }
+    
+    Q_INVOKABLE void riskyOperation() {
+        try {
+            // Do something
+        } catch (const std::exception &e) {
+            setError(e.what());
         }
     }
     
+signals:
+    void errorChanged();
+    
 private:
-    void setupLayerShell() {
-        auto layerWindow = LayerShellQt::Window::get(windowHandle());
-        layerWindow->setLayer(LayerTop);
-        layerWindow->setAnchors(AnchorTop | AnchorLeft | AnchorRight);
+    void setError(const QString &error) {
+        m_errorMessage = error;
+        emit errorChanged();
     }
     
-    void setupFallback() {
-        // X11-style window flags
-        setWindowFlags(Qt::Tool | Qt::FramelessWindowHint | 
-                      Qt::WindowStaysOnTopHint);
-        
-        qWarning() << "Layer shell not available, using fallback";
+    void clearError() {
+        m_errorMessage.clear();
+        emit errorChanged();
     }
+    
+    QString m_errorMessage;
 };
+```
+
+```qml
+// View.qml
+Rectangle {
+    // Error banner
+    Rectangle {
+        visible: model.hasError
+        color: "#ff5555"
+        height: 30
+        
+        Text {
+            text: model.errorMessage
+            color: "white"
+        }
+    }
+    
+    Button {
+        text: "Try Again"
+        onClicked: {
+            model.riskyOperation()
+        }
+    }
+}
 ```
 
 ---
 
-### Pattern 2: Validation
-
-**Validate configuration:**
+### Pattern 2: Check Layer Shell Availability
 
 ```cpp
-bool validateConfig(LayerShellQt::Window *window) {
-    // Check layer
-    if (window->layer() < LayerBackground || window->layer() > LayerOverlay) {
-        qWarning() << "Invalid layer:" << window->layer();
-        return false;
+// main.cpp
+int main(int argc, char *argv[]) {
+    QGuiApplication app(argc, argv);
+    
+    if (!LayerShellQt::Shell::isAvailable()) {
+        // Show error in QML
+        QQuickView errorView;
+        errorView.rootContext()->setContextProperty("errorMsg", 
+            "Layer shell not available. Please use a supported compositor.");
+        errorView.setSource(QUrl("qrc:/Error.qml"));
+        errorView.show();
+        return app.exec();
     }
     
-    // Check exclusive zone
-    if (window->exclusiveZone() < -1) {
-        qWarning() << "Invalid exclusive zone:" << window->exclusiveZone();
-        return false;
-    }
+    // Normal initialization
+    // ...
+}
+```
+
+```qml
+// Error.qml
+Rectangle {
+    color: "#2d2d2d"
     
-    return true;
+    ColumnLayout {
+        anchors.centerIn: parent
+        spacing: 20
+        
+        Text {
+            text: "❌"
+            font.pixelSize: 64
+            color: "#ff5555"
+        }
+        
+        Text {
+            text: "Error"
+            font.pixelSize: 24
+            color: "white"
+            font.bold: true
+        }
+        
+        Text {
+            text: errorMsg
+            font.pixelSize: 14
+            color: "#ccc"
+            wrapMode: Text.WordWrap
+            Layout.preferredWidth: 400
+        }
+        
+        Button {
+            text: "Exit"
+            onClicked: Qt.quit()
+        }
+    }
+}
+```
+
+---
+
+### Pattern 3: Graceful Degradation
+
+```cpp
+// main.cpp
+if (!LayerShellQt::Shell::isAvailable()) {
+    qWarning() << "Layer shell not available, using fallback";
+    
+    // Fallback: Normal window
+    QQuickView view;
+    view.setSource(QUrl("qrc:/Panel.qml"));
+    
+    // No layer shell configuration
+    view.setFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
+    view.show();
+    
+} else {
+    // Normal layer shell path
+    QQuickView view;
+    view.setSource(QUrl("qrc:/Panel.qml"));
+    
+    auto layerWindow = LayerShellQt::Window::get(&view);
+    layerWindow->setLayer(LayerShellQt::Window::LayerTop);
+    
+    view.show();
 }
 ```
 
@@ -651,215 +981,427 @@ bool validateConfig(LayerShellQt::Window *window) {
 
 ## Testing Strategies
 
-### Strategy 1: Unit Tests
-
-**Test layer configuration:**
+### Strategy 1: Unit Test Models
 
 ```cpp
-class LayerWindowTest : public QObject {
+// test_model.cpp
+#include <QtTest>
+#include "PanelModel.h"
+
+class TestPanelModel : public QObject {
     Q_OBJECT
+    
 private slots:
-    void testLayerConfiguration() {
-        QWidget widget;
-        auto layerWindow = LayerShellQt::Window::get(widget.windowHandle());
-        
-        layerWindow->setLayer(LayerShellQt::Window::LayerTop);
-        QCOMPARE(layerWindow->layer(), LayerShellQt::Window::LayerTop);
-        
-        layerWindow->setAnchors(LayerShellQt::Window::AnchorTop);
-        QVERIFY(layerWindow->anchors() & LayerShellQt::Window::AnchorTop);
+    void testInitialState() {
+        PanelModel model;
+        QVERIFY(!model.title().isEmpty());
+        QCOMPARE(model.isEnabled(), true);
     }
     
-    void testExclusiveZone() {
-        QWidget widget;
-        auto layerWindow = LayerShellQt::Window::get(widget.windowHandle());
+    void testPropertyChange() {
+        PanelModel model;
+        QSignalSpy spy(&model, &PanelModel::titleChanged);
         
-        layerWindow->setExclusiveZone(30);
-        QCOMPARE(layerWindow->exclusiveZone(), 30);
+        model.setTitle("New Title");
+        
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(model.title(), "New Title");
+    }
+    
+    void testAction() {
+        PanelModel model;
+        QSignalSpy spy(&model, &PanelModel::actionCompleted);
+        
+        model.executeAction();
+        
+        QCOMPARE(spy.count(), 1);
     }
 };
 
-QTEST_MAIN(LayerWindowTest)
+QTEST_MAIN(TestPanelModel)
+#include "test_model.moc"
 ```
 
 ---
 
-### Strategy 2: Integration Tests
+### Strategy 2: QML Test
 
-**Test with actual compositor:**
+```qml
+// tst_panel.qml
+import QtQuick 2.15
+import QtTest 1.15
 
-```cpp
-class IntegrationTest : public QObject {
-    Q_OBJECT
-private slots:
-    void initTestCase() {
-        if (!LayerShellQt::Shell::isAvailable()) {
-            QSKIP("Layer shell not available");
+TestCase {
+    name: "PanelTests"
+    
+    Component {
+        id: panelComponent
+        Panel {
+            // Test component
         }
     }
     
-    void testPanelDisplay() {
-        QWidget panel;
-        panel.setFixedHeight(30);
-        
-        auto layerWindow = LayerShellQt::Window::get(panel.windowHandle());
-        layerWindow->setLayer(LayerShellQt::Window::LayerTop);
-        
-        panel.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&panel));
-        
-        // Check window is at correct position
-        QCOMPARE(panel.y(), 0);  // At top
+    function test_creation() {
+        var panel = createTemporaryObject(panelComponent, testCase)
+        verify(panel !== null)
     }
-};
+    
+    function test_button_click() {
+        var panel = createTemporaryObject(panelComponent, testCase)
+        var button = findChild(panel, "menuButton")
+        
+        mouseClick(button)
+        
+        // Verify result
+        verify(panel.menuVisible)
+    }
+}
 ```
 
 ---
 
-### Strategy 3: Visual Testing
+### Strategy 3: Mock Models for QML Testing
 
-**Manual visual checks:**
+```cpp
+// MockModel.h
+class MockPanelModel : public PanelModel {
+    Q_OBJECT
+public:
+    Q_INVOKABLE void simulateUpdate() {
+        // Simulate data update for testing
+        setTitle("Test Title");
+        emit dataUpdated();
+    }
+};
+```
 
-```bash
-#!/bin/bash
-# visual_test.sh
+```qml
+// Test with mock
+TestCase {
+    function test_data_binding() {
+        var model = MockPanelModel {}
+        var panel = Panel {
+            panelModel: model
+        }
+        
+        model.simulateUpdate()
+        
+        compare(panel.titleText, "Test Title")
+    }
+}
+```
 
-echo "Testing panel..."
-./panel &
-PANEL_PID=$!
+---
 
-echo "Check: Panel at top? (y/n)"
-read -n 1 response
+### Strategy 4: Integration Tests
 
-if [ "$response" != "y" ]; then
-    echo "FAIL: Panel not at top"
-fi
-
-kill $PANEL_PID
+```cpp
+// test_integration.cpp
+void testLayerShellIntegration() {
+    if (!LayerShellQt::Shell::isAvailable()) {
+        QSKIP("Layer shell not available");
+    }
+    
+    PanelModel model;
+    QQuickView view;
+    
+    view.rootContext()->setContextProperty("panelModel", &model);
+    view.setSource(QUrl("qrc:/Panel.qml"));
+    
+    auto layerWindow = LayerShellQt::Window::get(&view);
+    layerWindow->setLayer(LayerShellQt::Window::LayerTop);
+    
+    view.show();
+    
+    QVERIFY(QTest::qWaitForWindowExposed(&view));
+    
+    // Test layer shell properties
+    QCOMPARE(layerWindow->layer(), LayerShellQt::Window::LayerTop);
+}
 ```
 
 ---
 
 ## Common Pitfalls
 
-### Pitfall 1: Setting Properties After Show
+### Pitfall 1: Forgetting NOTIFY Signal
 
 ```cpp
-// ✗ WRONG
-panel->show();
-layerWindow->setLayer(LayerTop);  // Too late!
+// ✗ WRONG: No NOTIFY signal
+Q_PROPERTY(QString title READ title WRITE setTitle)
+```
 
-// ✓ CORRECT
-layerWindow->setLayer(LayerTop);
-panel->show();
+```cpp
+// ✓ CORRECT: Include NOTIFY
+Q_PROPERTY(QString title READ title WRITE setTitle NOTIFY titleChanged)
+
+signals:
+    void titleChanged();
+```
+
+**Result:** QML won't auto-update when property changes!
+
+---
+
+### Pitfall 2: Direct QML Object Manipulation from C++
+
+```cpp
+// ✗ WRONG: Accessing QML objects from C++
+QObject *rootObject = view.rootObject();
+QObject *button = rootObject->findChild<QObject*>("menuButton");
+button->setProperty("text", "New Text");  // Anti-pattern!
+```
+
+```cpp
+// ✓ CORRECT: Use Model
+model.setButtonText("New Text");
+```
+
+```qml
+// QML binds to model
+Button {
+    text: model.buttonText
+}
 ```
 
 ---
 
-### Pitfall 2: Wrong Layer for Use Case
+### Pitfall 3: Heavy Computation in Property Getters
 
 ```cpp
-// ✗ WRONG: Wallpaper on TOP layer
-layerWindow->setLayer(LayerTop);  // Blocks apps!
-
-// ✓ CORRECT: Wallpaper on BACKGROUND
-layerWindow->setLayer(LayerBackground);
-```
-
----
-
-### Pitfall 3: Forgetting Exclusive Zone
-
-```cpp
-// ✗ WRONG: Panel without exclusive zone
-layerWindow->setLayer(LayerTop);
-layerWindow->setExclusiveZone(0);  // Apps overlap panel!
-
-// ✓ CORRECT
-layerWindow->setExclusiveZone(30);  // Reserve space
-```
-
----
-
-### Pitfall 4: Not Handling Screen Changes
-
-```cpp
-// ✗ WRONG: Static panel, doesn't adapt
-class StaticPanel : public QWidget {
-    // No screen change handling
-};
-
-// ✓ CORRECT: React to changes
-class DynamicPanel : public QWidget {
-    void init() {
-        connect(screen(), &QScreen::geometryChanged, 
-                this, &DynamicPanel::onScreenChanged);
+// ✗ WRONG: Expensive calculation in getter
+QString computedValue() const {
+    QString result;
+    for (int i = 0; i < 10000; ++i) {
+        result += QString::number(i);
     }
+    return result;  // Called every frame!
+}
+```
+
+```cpp
+// ✓ CORRECT: Cache result
+void updateValue() {
+    m_cachedValue = expensiveCalculation();
+    emit valueChanged();
+}
+
+QString value() const {
+    return m_cachedValue;  // Fast getter
+}
+```
+
+---
+
+### Pitfall 4: Memory Leaks with QQuickView
+
+```cpp
+// ✗ WRONG: Memory leak
+void createPanel(const QString &screen) {
+    QQuickView *view = new QQuickView();
+    // ... configure
+    view->show();
+    // Never deleted!
+}
+```
+
+```cpp
+// ✓ CORRECT: Track and cleanup
+QHash<QString, QQuickView*> m_views;
+
+void createPanel(const QString &screen) {
+    QQuickView *view = new QQuickView();
+    // ... configure
+    view->show();
+    m_views.insert(screen, view);
+}
+
+void removePanel(const QString &screen) {
+    QQuickView *view = m_views.take(screen);
+    if (view) view->deleteLater();
+}
+
+~Manager() {
+    qDeleteAll(m_views);
+}
+```
+
+---
+
+### Pitfall 5: Not Using Anchors in QML
+
+```qml
+// ✗ WRONG: Absolute positioning
+Rectangle {
+    Text {
+        x: 10
+        y: 10
+    }
+}
+```
+
+```qml
+// ✓ CORRECT: Anchors or layouts
+Rectangle {
+    Text {
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.margins: 10
+    }
+}
+
+// Or use layouts
+RowLayout {
+    Text { }
+}
+```
+
+---
+
+### Pitfall 6: Exposing Too Much to QML
+
+```cpp
+// ✗ WRONG: Everything public
+class Model : public QObject {
+    Q_INVOKABLE void internalMethod();  // Shouldn't be invokable!
+    Q_INVOKABLE void privateHelper();   // Shouldn't be invokable!
+    Q_INVOKABLE void publicAction();
+};
+```
+
+```cpp
+// ✓ CORRECT: Expose only what's needed
+class Model : public QObject {
+    Q_INVOKABLE void publicAction();  // Only this is invokable
+    
+private:
+    void internalMethod();
+    void privateHelper();
 };
 ```
 
 ---
 
-### Pitfall 5: Memory Leaks
+### Pitfall 7: Blocking UI Thread
 
 ```cpp
-// ✗ WRONG: Leak when screen removed
-void createPanel(QScreen *screen) {
-    QWidget *panel = new QWidget();  // Never deleted!
-    // ...
+// ✗ WRONG: Long operation on main thread
+Q_INVOKABLE void loadData() {
+    for (int i = 0; i < 1000000; ++i) {
+        processItem(i);  // UI freezes!
+    }
 }
+```
 
-// ✓ CORRECT: Proper cleanup
-QHash<QScreen*, QWidget*> panels;
-
-void createPanel(QScreen *screen) {
-    QWidget *panel = new QWidget();
-    panels.insert(screen, panel);
-}
-
-void removePanel(QScreen *screen) {
-    QWidget *panel = panels.take(screen);
-    if (panel) panel->deleteLater();
+```cpp
+// ✓ CORRECT: Use QtConcurrent or QThread
+Q_INVOKABLE void loadData() {
+    QtConcurrent::run([this]() {
+        for (int i = 0; i < 1000000; ++i) {
+            processItem(i);
+        }
+        
+        // Update UI on main thread
+        QMetaObject::invokeMethod(this, [this]() {
+            emit dataLoaded();
+        }, Qt::QueuedConnection);
+    });
 }
 ```
 
 ---
 
-## Checklist: Before Production
+## Architecture Checklist
 
-- [ ] Check `LayerShellQt::Shell::isAvailable()` at startup
-- [ ] Set all properties before `show()`
-- [ ] Use appropriate layer for use case
-- [ ] Match exclusive zone to purpose
-- [ ] Handle multi-monitor scenarios
-- [ ] Test on different compositors (Plasma, Sway)
-- [ ] Provide fallback for unsupported compositors
-- [ ] Validate all property values
-- [ ] Handle screen add/remove
-- [ ] Clean up resources properly
-- [ ] Test with different DPI settings
-- [ ] Check performance (no excessive repaints)
-- [ ] Follow accessibility guidelines
-- [ ] Document compositor requirements
+### Before Production
+
+- [ ] **Models tested independently**
+- [ ] **QML views use data binding (not imperative)**
+- [ ] **Layer shell configured before show()**
+- [ ] **Error handling implemented**
+- [ ] **Memory leaks checked (Valgrind/Qt Creator)**
+- [ ] **Performance profiled (QML Profiler)**
+- [ ] **Multi-monitor tested**
+- [ ] **Fallback for unsupported compositors**
+- [ ] **All Q_PROPERTY have NOTIFY signals**
+- [ ] **No heavy computation in property getters**
+- [ ] **Thread safety verified**
+- [ ] **Resources (.qrc) properly configured**
+
+---
+
+## Code Review Checklist
+
+### Model (C++)
+- [ ] Clear responsibilities (no UI code)
+- [ ] All properties have NOTIFY signals
+- [ ] Invokable methods documented
+- [ ] Error handling implemented
+- [ ] Thread-safe if needed
+- [ ] Memory management correct
+
+### View (QML)
+- [ ] Declarative, not imperative
+- [ ] Uses data binding
+- [ ] Anchors or layouts (not absolute positioning)
+- [ ] Animations smooth (Behavior)
+- [ ] No business logic
+- [ ] Reusable components extracted
+
+### Integration (main.cpp)
+- [ ] Layer shell availability checked
+- [ ] Models exposed correctly
+- [ ] Layer shell configured properly
+- [ ] Resource cleanup handled
+- [ ] Multi-monitor support if needed
 
 ---
 
 ## Summary: Golden Rules
 
-1. **Configure before show**
-2. **Use appropriate layer**
-3. **Reserve space wisely**
-4. **Minimize keyboard grabs**
-5. **Support multi-monitor**
-6. **Handle errors gracefully**
-7. **Optimize performance**
-8. **Test thoroughly**
+### Model (C++)
+1. **Business logic only** - No UI manipulation
+2. **NOTIFY signals** - Always include for Q_PROPERTY
+3. **Fast getters** - Cache expensive computations
+4. **Q_INVOKABLE** - Only expose what QML needs
+5. **Thread safety** - Use QtConcurrent for long operations
+
+### View (QML)
+1. **Declarative** - Use property bindings, not imperative code
+2. **Layouts** - Use anchors/layouts, not absolute positioning
+3. **Components** - Extract reusable components
+4. **Animations** - Use Behavior for smooth transitions
+5. **No logic** - Keep business logic in model
+
+### Integration
+1. **Check availability** - LayerShellQt::Shell::isAvailable()
+2. **Configure first** - Layer shell before show()
+3. **Proper scope** - Per-screen for multi-monitor
+4. **Cleanup** - Delete views when screens removed
+5. **Error handling** - Graceful degradation
 
 ---
 
-## Next Steps
+## Resources
 
-You're now a LayerShellQt expert! Check:
-- **[06-quick-reference.md](./06-quick-reference.md)** - Cheatsheet
+### QML Learning
+- **Qt QML**: https://doc.qt.io/qt-5/qmlapplications.html
+- **QML Performance**: https://doc.qt.io/qt-5/qtquick-performance.html
+- **QML Best Practices**: https://doc.qt.io/qt-5/qtquick-bestpractices.html
 
-Happy coding! 🎉
+### Model-View
+- **Model/View**: https://doc.qt.io/qt-5/model-view-programming.html
+- **C++ Integration**: https://doc.qt.io/qt-5/qtqml-cppintegration-topic.html
+
+### Testing
+- **Qt Test**: https://doc.qt.io/qt-5/qtest-overview.html
+- **QML Test**: https://doc.qt.io/qt-5/qttest-qmlmodule.html
+
+---
+
+**Follow these best practices for clean, maintainable, and performant LayerShellQt applications! 🚀**
+
+---
+
+*Updated: December 2024*
+*QML + Model-View Architecture*
