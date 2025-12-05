@@ -1,0 +1,111 @@
+# File cấu hình Sway mẫu
+# Copy vào ~/.config/sway/config
+
+# Modifier key
+set $mod Mod4
+
+# Applications
+set $term alacritty
+set $menu rofi -show drun
+set $browser firefox
+set $editor code
+
+# Keybindings cơ bản
+bindsym $mod+Return exec $term
+bindsym $mod+d exec $menu
+bindsym $mod+Shift+q kill
+
+# Focus
+bindsym $mod+h focus left
+bindsym $mod+j focus down
+bindsym $mod+k focus up
+bindsym $mod+l focus right
+
+# Move window
+bindsym $mod+Shift+h move left
+bindsym $mod+Shift+j move down
+bindsym $mod+Shift+k move up
+bindsym $mod+Shift+l move right
+
+# Workspaces
+bindsym $mod+1 workspace number 1
+bindsym $mod+2 workspace number 2
+bindsym $mod+3 workspace number 3
+bindsym $mod+4 workspace number 4
+bindsym $mod+5 workspace number 5
+bindsym $mod+6 workspace number 6
+bindsym $mod+7 workspace number 7
+bindsym $mod+8 workspace number 8
+bindsym $mod+9 workspace number 9
+bindsym $mod+0 workspace number 10
+
+# Move container to workspace
+bindsym $mod+Shift+1 move container to workspace number 1
+bindsym $mod+Shift+2 move container to workspace number 2
+bindsym $mod+Shift+3 move container to workspace number 3
+bindsym $mod+Shift+4 move container to workspace number 4
+bindsym $mod+Shift+5 move container to workspace number 5
+bindsym $mod+Shift+6 move container to workspace number 6
+bindsym $mod+Shift+7 move container to workspace number 7
+bindsym $mod+Shift+8 move container to workspace number 8
+bindsym $mod+Shift+9 move container to workspace number 9
+bindsym $mod+Shift+0 move container to workspace number 10
+
+# Layout
+bindsym $mod+s layout stacking
+bindsym $mod+w layout tabbed
+bindsym $mod+e layout toggle split
+
+# Fullscreen
+bindsym $mod+f fullscreen toggle
+
+# Floating
+bindsym $mod+Shift+Space floating toggle
+
+# Reload config
+bindsym $mod+Shift+c reload
+
+# Exit
+bindsym $mod+Shift+e exec swaynag -t warning -m 'Exit Sway?' -b 'Yes' 'swaymsg exit'
+
+# Status bar
+bar {
+    position top
+    status_command waybar
+    font pango:DejaVu Sans Mono 10
+}
+
+# Background
+output * bg ~/Pictures/wallpaper.jpg fill
+
+# Input
+input * {
+    xkb_layout us,vi
+    xkb_options grp:alt_shift_toggle
+    tap enabled
+    natural_scroll enabled
+}
+
+# Window decorations
+default_border pixel 2
+default_floating_border pixel 2
+hide_edge_borders smart
+
+# Gaps (nếu muốn)
+# gaps inner 10
+# gaps outer 5
+
+# Colors
+client.focused #4c7899 #285577 #ffffff #2e9ef4 #285577
+client.focused_inactive #333333 #5f676a #ffffff #484e50 #5f676a
+client.unfocused #333333 #222222 #888888 #292d2e #222222
+client.urgent #2f343a #900000 #ffffff #900000 #900000
+
+# Auto-start applications
+exec swaybg -i ~/Pictures/wallpaper.jpg
+exec waybar
+exec mako
+
+# Window rules
+for_window [class="Firefox"] floating enable
+for_window [class="Pavucontrol"] floating enable, resize set 800 600
