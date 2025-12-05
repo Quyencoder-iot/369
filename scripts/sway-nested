@@ -1,0 +1,166 @@
+#!/bin/bash
+# ═══════════════════════════════════════════════════════════════════
+#                    SWAY NESTED LAUNCHER
+# ═══════════════════════════════════════════════════════════════════
+# Usage: sway-nested [--debug] [--config <path>]
+
+set -e
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+log() { echo -e "${GREEN}[SWAY]${NC} $1"; }
+warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
+error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
+
+# ─────────────────────────────────────────────────────────────────────
+# DETECT SESSION TYPE
+# ─────────────────────────────────────────────────────────────────────
+
+detect_session() {
+    if [ -n "$WAYLAND_DISPLAY" ]; then
+        echo "wayland"
+    elif [ -n "$DISPLAY" ]; then
+        echo "x11"
+    else
+        echo "tty"
+    fi
+}
+
+# ─────────────────────────────────────────────────────────────────────
+# CHECK DEPENDENCIES
+# ─────────────────────────────────────────────────────────────────────
+
+check_deps() {
+    local deps=("sway")
+    local missing=()
+    
+    for dep in "${deps[@]}"; do
+        if ! command -v "$dep" &> /dev/null; then
+            missing+=("$dep")
+        fi
+    done
+    
+    if [ ${#missing[@]} -gt 0 ]; then
+        error "Missing dependencies: ${missing[*]}\nInstall with: sudo apt install ${missing[*]}"
+    fi
+}
+
+# ─────────────────────────────────────────────────────────────────────
+# USAGE
+# ─────────────────────────────────────────────────────────────────────
+
+usage() {
+    cat << EOF
+Usage: sway-nested [OPTIONS]
+
+Options:
+    -d, --debug     Enable debug mode (logs to ~/sway-nested.log)
+    -c, --config    Path to custom config file
+    -h, --help      Show this help message
+
+Environment Variables:
+    WLR_RENDERER    Set renderer (gles2, vulkan, pixman)
+    
+Examples:
+    sway-nested                     # Start with auto-detected settings
+    sway-nested --debug             # Start with debug logging
+    sway-nested -c ~/my-config      # Use custom config
+
+EOF
+    exit 0
+}
+
+# ─────────────────────────────────────────────────────────────────────
+# MAIN
+# ─────────────────────────────────────────────────────────────────────
+
+main() {
+    local debug=false
+    local config=""
+    
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -d|--debug)
+                debug=true
+                shift
+                ;;
+            -c|--config)
+                config="$2"
+                shift 2
+                ;;
+            -h|--help)
+                usage
+                ;;
+            *)
+                shift
+                ;;
+        esac
+    done
+    
+    # Check dependencies
+    check_deps
+    
+    # Detect session
+    local session=$(detect_session)
+    log "Detected session: $session"
+    
+    case $session in
+        wayland)
+            export WLR_BACKENDS=wayland
+            log "Using Wayland backend"
+            ;;
+        x11)
+            export WLR_BACKENDS=x11
+            log "Using X11 backend"
+            ;;
+        tty)
+            error "Cannot run nested from TTY. Start a graphical session first."
+            ;;
+    esac
+    
+    # Set environment for apps
+    export XDG_CURRENT_DESKTOP=sway
+    export MOZ_ENABLE_WAYLAND=1
+    export QT_QPA_PLATFORM=wayland
+    export SDL_VIDEODRIVER=wayland
+    export _JAVA_AWT_WM_NONREPARENTING=1
+    
+    # Find config file
+    if [ -z "$config" ]; then
+        if [ -f "$HOME/.config/sway/config.nested" ]; then
+            config="$HOME/.config/sway/config.nested"
+        elif [ -f "$HOME/.config/sway/config" ]; then
+            config="$HOME/.config/sway/config"
+        fi
+    fi
+    
+    if [ -n "$config" ]; then
+        log "Using config: $config"
+    fi
+    
+    # Run Sway
+    if [ "$debug" = true ]; then
+        log "Running in debug mode..."
+        log "Logs will be saved to ~/sway-nested.log"
+        export WAYLAND_DEBUG=1
+        if [ -n "$config" ]; then
+            sway -d -c "$config" 2>&1 | tee ~/sway-nested.log
+        else
+            sway -d 2>&1 | tee ~/sway-nested.log
+        fi
+    else
+        if [ -n "$config" ]; then
+            exec sway -c "$config"
+        else
+            exec sway
+        fi
+    fi
+}
+
+main "$@"

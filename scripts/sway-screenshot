@@ -1,0 +1,145 @@
+#!/bin/bash
+# ═══════════════════════════════════════════════════════════════════
+#                    SWAY SCREENSHOT TOOL
+# ═══════════════════════════════════════════════════════════════════
+# Usage: sway-screenshot [full|region|window] [--no-copy] [--output <path>]
+
+set -e
+
+# Default settings
+SCREENSHOT_DIR="${SCREENSHOT_DIR:-$HOME/Pictures/Screenshots}"
+COPY_TO_CLIPBOARD=true
+OUTPUT_FILE=""
+
+# Ensure directory exists
+mkdir -p "$SCREENSHOT_DIR"
+
+# ─────────────────────────────────────────────────────────────────────
+# PARSE ARGUMENTS
+# ─────────────────────────────────────────────────────────────────────
+
+MODE="full"
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        full|region|window)
+            MODE="$1"
+            shift
+            ;;
+        --no-copy)
+            COPY_TO_CLIPBOARD=false
+            shift
+            ;;
+        --output|-o)
+            OUTPUT_FILE="$2"
+            shift 2
+            ;;
+        --help|-h)
+            cat << EOF
+Usage: sway-screenshot [MODE] [OPTIONS]
+
+Modes:
+    full        Capture entire screen (default)
+    region      Select a region to capture
+    window      Capture focused window only
+
+Options:
+    --no-copy           Don't copy to clipboard
+    --output, -o PATH   Save to specific path
+    --help, -h          Show this help
+
+Environment:
+    SCREENSHOT_DIR      Directory to save screenshots
+                        (default: ~/Pictures/Screenshots)
+
+Examples:
+    sway-screenshot                     # Full screen
+    sway-screenshot region              # Select region
+    sway-screenshot window -o ~/ss.png  # Window to specific file
+EOF
+            exit 0
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
+# ─────────────────────────────────────────────────────────────────────
+# CHECK DEPENDENCIES
+# ─────────────────────────────────────────────────────────────────────
+
+check_command() {
+    if ! command -v "$1" &> /dev/null; then
+        echo "Error: $1 is required but not installed."
+        echo "Install with: sudo apt install $2"
+        exit 1
+    fi
+}
+
+check_command grim grim
+check_command jq jq
+
+if [ "$MODE" = "region" ]; then
+    check_command slurp slurp
+fi
+
+if [ "$COPY_TO_CLIPBOARD" = true ]; then
+    check_command wl-copy wl-clipboard
+fi
+
+# ─────────────────────────────────────────────────────────────────────
+# GENERATE FILENAME
+# ─────────────────────────────────────────────────────────────────────
+
+if [ -z "$OUTPUT_FILE" ]; then
+    TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+    OUTPUT_FILE="$SCREENSHOT_DIR/screenshot-$TIMESTAMP.png"
+fi
+
+# ─────────────────────────────────────────────────────────────────────
+# CAPTURE SCREENSHOT
+# ─────────────────────────────────────────────────────────────────────
+
+case "$MODE" in
+    full)
+        grim "$OUTPUT_FILE"
+        ;;
+    region)
+        GEOMETRY=$(slurp)
+        if [ -z "$GEOMETRY" ]; then
+            echo "Selection cancelled"
+            exit 1
+        fi
+        grim -g "$GEOMETRY" "$OUTPUT_FILE"
+        ;;
+    window)
+        # Get focused window geometry
+        GEOMETRY=$(swaymsg -t get_tree | jq -r '
+            .. | select(.focused? == true) | 
+            .rect | "\(.x),\(.y) \(.width)x\(.height)"
+        ')
+        if [ -z "$GEOMETRY" ] || [ "$GEOMETRY" = "null" ]; then
+            echo "No focused window found"
+            exit 1
+        fi
+        grim -g "$GEOMETRY" "$OUTPUT_FILE"
+        ;;
+esac
+
+# ─────────────────────────────────────────────────────────────────────
+# COPY TO CLIPBOARD
+# ─────────────────────────────────────────────────────────────────────
+
+if [ "$COPY_TO_CLIPBOARD" = true ]; then
+    wl-copy < "$OUTPUT_FILE"
+fi
+
+# ─────────────────────────────────────────────────────────────────────
+# NOTIFICATION
+# ─────────────────────────────────────────────────────────────────────
+
+if command -v notify-send &> /dev/null; then
+    notify-send -i "$OUTPUT_FILE" "Screenshot saved" "$OUTPUT_FILE"
+fi
+
+echo "$OUTPUT_FILE"

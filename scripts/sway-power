@@ -1,0 +1,56 @@
+#!/bin/bash
+# ═══════════════════════════════════════════════════════════════════
+#                    SWAY POWER MENU
+# ═══════════════════════════════════════════════════════════════════
+
+# Check for launcher
+LAUNCHER=""
+if command -v wofi &> /dev/null; then
+    LAUNCHER="wofi --dmenu -i -p 'Power:'"
+elif command -v dmenu &> /dev/null; then
+    LAUNCHER="dmenu -i -p 'Power:'"
+elif command -v rofi &> /dev/null; then
+    LAUNCHER="rofi -dmenu -i -p 'Power:'"
+else
+    # Fallback to swaynag
+    swaynag -t warning -m 'Power Options' \
+        -B 'Lock' 'swaylock -f -c 000000' \
+        -B 'Logout' 'swaymsg exit' \
+        -B 'Suspend' 'systemctl suspend' \
+        -B 'Reboot' 'systemctl reboot' \
+        -B 'Shutdown' 'systemctl poweroff'
+    exit 0
+fi
+
+# Menu options
+OPTIONS="🔒 Lock
+🚪 Logout
+💤 Suspend
+❄️ Hibernate
+🔄 Reboot
+⏻ Shutdown"
+
+# Show menu
+SELECTED=$(echo -e "$OPTIONS" | eval "$LAUNCHER")
+
+# Handle selection
+case "$SELECTED" in
+    *Lock*)
+        swaylock -f -c 000000
+        ;;
+    *Logout*)
+        swaymsg exit
+        ;;
+    *Suspend*)
+        swaylock -f -c 000000 && systemctl suspend
+        ;;
+    *Hibernate*)
+        swaylock -f -c 000000 && systemctl hibernate
+        ;;
+    *Reboot*)
+        systemctl reboot
+        ;;
+    *Shutdown*)
+        systemctl poweroff
+        ;;
+esac

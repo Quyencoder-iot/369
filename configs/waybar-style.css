@@ -1,0 +1,137 @@
+/* ═══════════════════════════════════════════════════════════════════
+ *                    WAYBAR STYLE - TOKYO NIGHT
+ * ═══════════════════════════════════════════════════════════════════
+ * Copy to ~/.config/waybar/style.css
+ */
+
+/* Global */
+* {
+    font-family: "JetBrains Mono", "Noto Sans", sans-serif;
+    font-size: 12px;
+    min-height: 0;
+}
+
+/* Main bar */
+window#waybar {
+    background-color: #1a1b26;
+    color: #c0caf5;
+    transition-property: background-color;
+    transition-duration: 0.3s;
+    border-bottom: 2px solid #24283b;
+}
+
+window#waybar.hidden {
+    opacity: 0.2;
+}
+
+/* Tooltip */
+tooltip {
+    background: #1a1b26;
+    border: 1px solid #7aa2f7;
+    border-radius: 4px;
+}
+
+tooltip label {
+    color: #c0caf5;
+}
+
+/* Workspaces */
+#workspaces {
+    margin: 0 4px;
+}
+
+#workspaces button {
+    padding: 0 8px;
+    background-color: transparent;
+    color: #565f89;
+    border: none;
+    border-radius: 4px;
+    margin: 2px;
+}
+
+#workspaces button:hover {
+    background: rgba(122, 162, 247, 0.2);
+    color: #c0caf5;
+}
+
+#workspaces button.focused {
+    background-color: #7aa2f7;
+    color: #1a1b26;
+}
+
+#workspaces button.urgent {
+    background-color: #f7768e;
+    color: #1a1b26;
+}
+
+/* Mode */
+#mode {
+    background-color: #bb9af7;
+    color: #1a1b26;
+    padding: 0 8px;
+    margin: 2px 4px;
+    border-radius: 4px;
+}
+
+/* Window title */
+#window {
+    margin: 0 8px;
+    color: #c0caf5;
+}
+
+/* Right side modules */
+#clock,
+#cpu,
+#memory,
+#pulseaudio,
+#tray {
+    padding: 0 10px;
+    margin: 2px 2px;
+    color: #c0caf5;
+    background-color: #24283b;
+    border-radius: 4px;
+}
+
+/* Clock */
+#clock {
+    background-color: #7aa2f7;
+    color: #1a1b26;
+    font-weight: bold;
+}
+
+/* CPU */
+#cpu {
+    background-color: #9ece6a;
+    color: #1a1b26;
+}
+
+/* Memory */
+#memory {
+    background-color: #e0af68;
+    color: #1a1b26;
+}
+
+/* Audio */
+#pulseaudio {
+    background-color: #bb9af7;
+    color: #1a1b26;
+}
+
+#pulseaudio.muted {
+    background-color: #565f89;
+    color: #c0caf5;
+}
+
+/* Tray */
+#tray {
+    background-color: #24283b;
+}
+
+#tray > .passive {
+    -gtk-icon-effect: dim;
+}
+
+#tray > .needs-attention {
+    -gtk-icon-effect: highlight;
+    background-color: #f7768e;
+}

@@ -1,0 +1,62 @@
+#!/bin/bash
+# ═══════════════════════════════════════════════════════════════════
+#                    SWAY WINDOW SELECTOR
+# ═══════════════════════════════════════════════════════════════════
+# Interactive window switcher using wofi/dmenu
+
+set -e
+
+# Check for launcher
+LAUNCHER=""
+if command -v wofi &> /dev/null; then
+    LAUNCHER="wofi --dmenu -i -p 'Window:'"
+elif command -v dmenu &> /dev/null; then
+    LAUNCHER="dmenu -i -p 'Window:'"
+elif command -v rofi &> /dev/null; then
+    LAUNCHER="rofi -dmenu -i -p 'Window:'"
+else
+    echo "Error: No launcher found (wofi, dmenu, or rofi required)"
+    exit 1
+fi
+
+# Get all windows
+get_windows() {
+    swaymsg -t get_tree | jq -r '
+        recurse(.nodes[]?, .floating_nodes[]?) |
+        select(.type == "con" and .name != null and .name != "") |
+        "\(.id)|\(.app_id // .window_properties.class // "unknown")|\(.name)"
+    '
+}
+
+# Format for display
+format_windows() {
+    while IFS='|' read -r id app name; do
+        # Truncate long names
+        if [ ${#name} -gt 60 ]; then
+            name="${name:0:57}..."
+        fi
+        echo "$id|[$app] $name"
+    done
+}
+
+# Main
+windows=$(get_windows | format_windows)
+
+if [ -z "$windows" ]; then
+    notify-send "No windows" "No windows found to switch to"
+    exit 0
+fi
+
+# Show in launcher
+selected=$(echo "$windows" | cut -d'|' -f2 | eval "$LAUNCHER")
+
+if [ -z "$selected" ]; then
+    exit 0
+fi
+
+# Find the window ID
+window_id=$(echo "$windows" | grep -F "$selected" | head -1 | cut -d'|' -f1)
+
+if [ -n "$window_id" ]; then
+    swaymsg "[con_id=$window_id]" focus
+fi
