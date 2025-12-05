@@ -1,0 +1,52 @@
+# Minimal Sway Config
+# For nested testing
+
+set $mod Mod1  # Alt key (to avoid conflicts with host)
+set $term foot
+
+# Key bindings
+bindsym $mod+Return exec $term
+bindsym $mod+Shift+q kill
+bindsym $mod+d exec wofi --show drun
+
+# Movement
+bindsym $mod+Left focus left
+bindsym $mod+Down focus down
+bindsym $mod+Up focus up
+bindsym $mod+Right focus right
+
+bindsym $mod+Shift+Left move left
+bindsym $mod+Shift+Down move down
+bindsym $mod+Shift+Up move up
+bindsym $mod+Shift+Right move right
+
+# Workspaces
+bindsym $mod+1 workspace number 1
+bindsym $mod+2 workspace number 2
+bindsym $mod+3 workspace number 3
+bindsym $mod+4 workspace number 4
+
+bindsym $mod+Shift+1 move container to workspace number 1
+bindsym $mod+Shift+2 move container to workspace number 2
+bindsym $mod+Shift+3 move container to workspace number 3
+bindsym $mod+Shift+4 move container to workspace number 4
+
+# Layout
+bindsym $mod+h splith
+bindsym $mod+v splitv
+bindsym $mod+f fullscreen
+bindsym $mod+Shift+space floating toggle
+
+# Reload/Exit
+bindsym $mod+Shift+c reload
+bindsym $mod+Shift+e exit
+
+# Status bar
+bar {
+    position top
+    status_command while date +'%Y-%m-%d %H:%M'; do sleep 1; done
+}
+
+# Appearance
+default_border pixel 2
+gaps inner 3
