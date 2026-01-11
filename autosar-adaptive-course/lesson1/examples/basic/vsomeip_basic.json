@@ -1,0 +1,25 @@
+{
+    "unicast": "127.0.0.1",
+    "logging": {
+        "level": "info",
+        "console": "true"
+    },
+    "applications": [
+        { "name": "hello_service", "id": "0x1111" },
+        { "name": "hello_client", "id": "0x2222" }
+    ],
+    "services": [
+        {
+            "service": "0x1234",
+            "instance": "0x5678",
+            "unreliable": "30509"
+        }
+    ],
+    "routing": "hello_service",
+    "service-discovery": {
+        "enable": "true",
+        "multicast": "224.244.224.245",
+        "port": "30490",
+        "protocol": "udp"
+    }
+}

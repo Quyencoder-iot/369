@@ -1,0 +1,15 @@
+{
+    "vehicle_info": {
+        "model": "EV-2025",
+        "vin": "VN1234567890"
+    },
+    "sensors": {
+        "speed": 60,
+        "battery_level": 75,
+        "temperature": 25
+    },
+    "warnings": [
+        {"code": "W001", "message": "Low washer fluid"}
+    ],
+    "drive_mode": "eco"
+}

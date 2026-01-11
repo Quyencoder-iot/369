@@ -1,0 +1,42 @@
+# ============================================================================
+# docker-compose.yml - Chạy Service và Client trong containers
+# ============================================================================
+version: '3.8'
+
+services:
+  # Dashboard Service
+  dashboard-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: autosar-dashboard-service
+    command: ./bin/dashboard_service
+    volumes:
+      - ./config:/app/config:ro
+      - ./data:/app/data
+    environment:
+      - VSOMEIP_CONFIGURATION=/app/config/vsomeip.json
+    networks:
+      - autosar-net
+    restart: unless-stopped
+
+  # Console Client
+  dashboard-client:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: autosar-dashboard-client
+    command: ./bin/dashboard_client_console
+    depends_on:
+      - dashboard-service
+    volumes:
+      - ./config:/app/config:ro
+    environment:
+      - VSOMEIP_CONFIGURATION=/app/config/vsomeip.json
+    networks:
+      - autosar-net
+    restart: unless-stopped
+
+networks:
+  autosar-net:
+    driver: bridge

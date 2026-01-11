@@ -1,0 +1,94 @@
+{
+    "vehicle_info": {
+        "model": "EV-2025 Premium",
+        "vin": "VN1234567890ABCDE",
+        "year": 2025,
+        "manufacturer": "VN Auto",
+        "software_version": "2.5.1"
+    },
+    
+    "sensors": {
+        "speed": {
+            "value": 0,
+            "unit": "km/h",
+            "min": 0,
+            "max": 200,
+            "status": "online",
+            "last_update": "2025-01-11T10:00:00Z"
+        },
+        "battery": {
+            "level": 85,
+            "voltage": 400.5,
+            "current": 15.2,
+            "temperature": 32,
+            "charging": false,
+            "health": 98,
+            "range_km": 320,
+            "status": "online"
+        },
+        "temperature": {
+            "engine": 0,
+            "motor": 45,
+            "cabin": 22,
+            "outside": 28,
+            "hvac_target": 22,
+            "status": "online"
+        },
+        "tire_pressure": {
+            "front_left": 2.4,
+            "front_right": 2.4,
+            "rear_left": 2.3,
+            "rear_right": 2.4,
+            "unit": "bar",
+            "status": "online"
+        },
+        "odometer": {
+            "total_km": 15234,
+            "trip_km": 45.7
+        }
+    },
+    
+    "warnings": [
+        {
+            "code": "W001",
+            "message": "Low washer fluid",
+            "severity": "low",
+            "timestamp": "2025-01-11T08:30:00Z",
+            "acknowledged": false
+        },
+        {
+            "code": "W002", 
+            "message": "Tire pressure low - rear left",
+            "severity": "medium",
+            "timestamp": "2025-01-11T09:00:00Z",
+            "acknowledged": false
+        }
+    ],
+    
+    "drive_mode": {
+        "current": "eco",
+        "available": ["eco", "normal", "sport", "snow", "offroad"],
+        "auto_mode": false
+    },
+    
+    "diagnostics": {
+        "dtc_codes": [],
+        "sensor_status": {
+            "speed_sensor": "online",
+            "battery_sensor": "online",
+            "temperature_sensor": "online",
+            "tire_pressure_sensor": "online"
+        },
+        "last_diagnostic_run": "2025-01-10T23:00:00Z",
+        "last_service": "2024-12-01",
+        "next_service_km": 5000,
+        "errors": []
+    },
+    
+    "simulation": {
+        "enabled": true,
+        "speed_pattern": "city_driving",
+        "battery_drain_rate": 0.1,
+        "update_interval_ms": 100
+    }
+}
