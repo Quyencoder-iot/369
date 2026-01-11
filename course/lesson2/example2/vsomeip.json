@@ -1,0 +1,44 @@
+{
+    "unicast": "127.0.0.1",
+    "logging": {
+        "level": "info",
+        "console": "true"
+    },
+    "applications": [
+        {
+            "name": "dashboard_service",
+            "id": "0x2001"
+        },
+        {
+            "name": "dashboard_client",
+            "id": "0x2002"
+        }
+    ],
+    "services": [
+        {
+            "service": "0x2000",
+            "instance": "0x0001",
+            "unreliable": "30520",
+            "events": [
+                {
+                    "event": "0x8001",
+                    "is_field": "true",
+                    "is_reliable": "false"
+                }
+            ],
+            "eventgroups": [
+                {
+                    "eventgroup": "0x0001",
+                    "events": ["0x8001"]
+                }
+            ]
+        }
+    ],
+    "routing": "dashboard_service",
+    "service-discovery": {
+        "enable": "true",
+        "multicast": "239.224.224.245",
+        "port": "30490",
+        "protocol": "udp"
+    }
+}

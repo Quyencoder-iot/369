@@ -1,0 +1,15 @@
+{
+    "unicast": "127.0.0.1",
+    "applications": [
+        { "name": "hello_service", "id": "0x1001" },
+        { "name": "hello_client", "id": "0x1002" }
+    ],
+    "services": [
+        {
+            "service": "0x1234",
+            "instance": "0x5678",
+            "unreliable": "30509"
+        }
+    ],
+    "routing": "hello_service"
+}

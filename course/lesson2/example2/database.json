@@ -1,0 +1,35 @@
+{
+    "vehicle": {
+        "speed": 120,
+        "rpm": 3500,
+        "gear": 4,
+        "odometer": 45678.5
+    },
+    "battery": {
+        "level": 85,
+        "voltage": 12.6,
+        "temperature": 35,
+        "charging": false
+    },
+    "sensors": {
+        "engine_temp": 92,
+        "oil_pressure": 45,
+        "fuel_level": 65,
+        "coolant_temp": 88
+    },
+    "warnings": [
+        {"code": "W001", "message": "Low fuel", "severity": 1},
+        {"code": "W002", "message": "Service due", "severity": 0}
+    ],
+    "drive_mode": {
+        "current": "sport",
+        "available": ["eco", "normal", "sport", "snow"]
+    },
+    "diagnostics": {
+        "sensors_status": {
+            "speed_sensor": true,
+            "battery_sensor": true,
+            "temp_sensor": false
+        }
+    }
+}

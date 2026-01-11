@@ -1,0 +1,7 @@
+{
+    "speed": 120,
+    "battery": 85,
+    "temperature": 25,
+    "warnings": ["Low fuel", "Service due"],
+    "drive_mode": "sport"
+}
